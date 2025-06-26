@@ -59,7 +59,7 @@ func newThread(executor *JsExecutor, name string, threadId uint32) (*thread, err
 // initEngine initializes the JavaScript engine for this thread
 func (t *thread) initEngine() error {
 	// Create a new JavaScript engine instance
-	jsEngine, err := t.executor.engineBuilder.Build(t.executor.engineOptions...)
+	jsEngine, err := t.executor.engineFactory()
 	if err != nil {
 		return fmt.Errorf("failed to create JS engine: %w", err)
 	}
@@ -84,16 +84,20 @@ func (t *thread) run() {
 	// Cleanup when the thread exits
 	defer func() {
 		if r := recover(); r != nil {
-			t.executor.logger.Error("Thread panic",
-				"thread", t.name,
-				"error", r)
+			if t.executor.logger != nil {
+				t.executor.logger.Error("Thread panic",
+					"thread", t.name,
+					"error", r)
+			}
 		}
 		// Close the JavaScript engine
 		if t.jsEngine != nil {
 			if err := t.jsEngine.Close(); err != nil {
-				t.executor.logger.Error("Failed to close JS engine",
-					"thread", t.name,
-					"error", err)
+				if t.executor.logger != nil {
+					t.executor.logger.Error("Failed to close JS engine",
+						"thread", t.name,
+						"error", err)
+				}
 			}
 		}
 	}()
@@ -137,9 +141,11 @@ func (t *thread) run() {
 					t.executeAction(actionReq)
 				} else {
 					pendingAction = actionReq
-					t.executor.logger.Info("Reload request received, waiting for queue to empty",
-						"thread", t.name,
-						"queueSize", len(t.taskQueue))
+					if t.executor.logger != nil {
+						t.executor.logger.Info("Reload request received, waiting for queue to empty",
+							"thread", t.name,
+							"queueSize", len(t.taskQueue))
+					}
 				}
 			}
 		}
@@ -150,14 +156,18 @@ func (t *thread) run() {
 func (t *thread) executeAction(req *threadActionRequest) {
 	switch req.action {
 	case actionStop:
-		t.executor.logger.Info("Thread stopping", "thread", t.name)
+		if t.executor.logger != nil {
+			t.executor.logger.Info("Thread stopping", "thread", t.name)
+		}
 
 		// Close the JavaScript engine
 		if t.jsEngine != nil {
 			if err := t.jsEngine.Close(); err != nil {
-				t.executor.logger.Error("Failed to close JS engine",
-					"thread", t.name,
-					"error", err)
+				if t.executor.logger != nil {
+					t.executor.logger.Error("Failed to close JS engine",
+						"thread", t.name,
+						"error", err)
+				}
 			}
 			t.jsEngine = nil
 		}
@@ -165,7 +175,9 @@ func (t *thread) executeAction(req *threadActionRequest) {
 		req.done <- nil
 
 	case actionReload:
-		t.executor.logger.Info("Thread starting reload", "thread", t.name)
+		if t.executor.logger != nil {
+			t.executor.logger.Info("Thread starting reload", "thread", t.name)
+		}
 
 		// Get initialization scripts safely
 		scripts := t.executor.getInitScripts()
@@ -173,12 +185,16 @@ func (t *thread) executeAction(req *threadActionRequest) {
 		req.done <- err
 
 		if err != nil {
-			t.executor.logger.Error("Thread reload failed",
-				"thread", t.name,
-				"error", err)
+			if t.executor.logger != nil {
+				t.executor.logger.Error("Thread reload failed",
+					"thread", t.name,
+					"error", err)
+			}
 		} else {
-			t.executor.logger.Info("Thread reload completed successfully",
-				"thread", t.name)
+			if t.executor.logger != nil {
+				t.executor.logger.Info("Thread reload completed successfully",
+					"thread", t.name)
+			}
 		}
 	}
 }
@@ -193,10 +209,12 @@ func (t *thread) executeTask(task *task) {
 				response: nil,
 				err:      fmt.Errorf("panic in thread %s: %v", t.name, r),
 			}
-			t.executor.logger.Error("Task execution panic",
-				"thread", t.name,
-				"taskID", t.getTaskCount(),
-				"error", r)
+			if t.executor.logger != nil {
+				t.executor.logger.Error("Task execution panic",
+					"thread", t.name,
+					"taskID", t.getTaskCount(),
+					"error", r)
+			}
 		}
 		// Update thread statistics atomically
 		atomic.StoreInt64(&t.lastUsedNano, time.Now().UnixNano())
@@ -243,7 +261,9 @@ func (t *thread) stop() {
 	select {
 	case t.actionQueue <- req:
 	case <-time.After(defaultActionTimeout):
-		t.executor.logger.Warn("Timeout sending stop signal", "thread", t.name)
+		if t.executor.logger != nil {
+			t.executor.logger.Warn("Timeout sending stop signal", "thread", t.name)
+		}
 		return
 	}
 

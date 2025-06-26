@@ -6,7 +6,6 @@ package jsexecutor
 import (
 	"fmt"
 	"log/slog"
-	"os"
 	"runtime"
 	"sync/atomic"
 	"time"
@@ -30,8 +29,7 @@ type JsExecutorOption struct {
 type JsExecutor struct {
 	options       *JsExecutorOption // Configuration options
 	pool          *pool             // Thread pool
-	engineBuilder JsEngineBuilder   // JavaScript engine builder
-	engineOptions []JsEngineOption  // Options for creating JavaScript engines
+	engineFactory JsEngineFactory   // JavaScript engine factory function
 
 	// Use atomic pointer for lock-free, zero-copy reads of initScripts
 	initScriptsPtr unsafe.Pointer // Points to []*InitScript (atomic access)
@@ -106,6 +104,7 @@ func NewExecutor(opts ...func(*JsExecutor)) (*JsExecutor, error) {
 	cpuCount := runtime.GOMAXPROCS(0)
 
 	executor := &JsExecutor{
+		logger: slog.Default(), // Default logger
 		options: &JsExecutorOption{
 			minPoolSize:     uint32(cpuCount),     // Default to CPU count
 			maxPoolSize:     uint32(cpuCount * 2), // Default to 2x CPU count
@@ -124,14 +123,9 @@ func NewExecutor(opts ...func(*JsExecutor)) (*JsExecutor, error) {
 		opt(executor)
 	}
 
-	// Set default logger if none provided
-	if executor.logger == nil {
-		executor.logger = slog.New(slog.NewTextHandler(os.Stdout, nil))
-	}
-
-	// JavaScript engine builder is required
-	if executor.engineBuilder == nil {
-		return nil, fmt.Errorf("JS engine builder is required")
+	// JavaScript engine factory is required
+	if executor.engineFactory == nil {
+		return nil, fmt.Errorf("JavaScript engine factory or factory must be provided")
 	}
 
 	executor.pool = newPool(executor)
@@ -140,15 +134,14 @@ func NewExecutor(opts ...func(*JsExecutor)) (*JsExecutor, error) {
 }
 
 // WithJsEngine configures the JavaScript engine builder and options
-func (e *JsExecutor) WithJsEngine(builder JsEngineBuilder, opts ...JsEngineOption) func(*JsExecutor) {
+func WithJsEngine(engineFactory JsEngineFactory) func(*JsExecutor) {
 	return func(executor *JsExecutor) {
-		executor.engineBuilder = builder
-		executor.engineOptions = opts
+		executor.engineFactory = engineFactory
 	}
 }
 
 // WithOptions configures the executor with custom options
-func (e *JsExecutor) WithOptions(opt *JsExecutorOption) func(*JsExecutor) {
+func WithOptions(opt *JsExecutorOption) func(*JsExecutor) {
 	return func(executor *JsExecutor) {
 		if opt.minPoolSize > 0 {
 			executor.options.minPoolSize = opt.minPoolSize
@@ -181,14 +174,14 @@ func (e *JsExecutor) WithOptions(opt *JsExecutorOption) func(*JsExecutor) {
 }
 
 // WithLogger configures the logger for the executor
-func (e *JsExecutor) WithLogger(logger *slog.Logger) func(*JsExecutor) {
+func WithLogger(logger *slog.Logger) func(*JsExecutor) {
 	return func(executor *JsExecutor) {
 		executor.logger = logger
 	}
 }
 
 // WithThresholds configures the load thresholds for thread management
-func (e *JsExecutor) WithThresholds(create, selectThreshold float64) func(*JsExecutor) {
+func WithThresholds(create, selectThreshold float64) func(*JsExecutor) {
 	return func(executor *JsExecutor) {
 		if create > 0 && create <= 1.0 {
 			executor.options.createThreshold = create
@@ -200,7 +193,7 @@ func (e *JsExecutor) WithThresholds(create, selectThreshold float64) func(*JsExe
 }
 
 // WithInitJsScripts configures the initialization scripts
-func (e *JsExecutor) WithInitJsScripts(scripts ...*InitScript) func(*JsExecutor) {
+func WithInitScripts(scripts ...*InitScript) func(*JsExecutor) {
 	return func(executor *JsExecutor) {
 		if len(scripts) > 0 {
 			executor.setInitScripts(scripts) // Use safe setter method

@@ -97,9 +97,11 @@ func (p *pool) createThread() (*thread, error) {
 	currentThreadCount := uint32(len(p.threads))
 	p.Unlock()
 
-	p.executor.logger.Info("Thread created",
-		"thread", t.name,
-		"totalThreads", currentThreadCount)
+	if p.executor.logger != nil {
+		p.executor.logger.Info("Thread created",
+			"thread", t.name,
+			"totalThreads", currentThreadCount)
+	}
 
 	return t, nil
 }
@@ -161,10 +163,13 @@ func (p *pool) getOrCreateThread(req *JsRequest) (*thread, error) {
 	p.RUnlock()
 
 	if currentThreadCount < p.executor.options.maxPoolSize {
-		p.executor.logger.Info("Creating new thread due to high load",
-			"currentThreads", currentThreadCount,
-			"maxPoolSize", p.executor.options.maxPoolSize)
+		if p.executor.logger != nil {
+			p.executor.logger.Info("Creating new thread due to high load",
+				"currentThreads", currentThreadCount,
+				"maxPoolSize", p.executor.options.maxPoolSize)
+		}
 		return p.createThread()
+
 	}
 
 	// At max capacity, return an existing thread
@@ -320,27 +325,33 @@ func (p *pool) performCleanup() {
 			if p.executor.options.maxExecutions > 0 && tc >= p.executor.options.maxExecutions {
 				reason = "max executions reached"
 			}
-			p.executor.logger.Info("Thread removed",
-				"thread", th.name,
-				"reason", reason,
-				"executions", tc,
-				"idleTime", now.Sub(lu),
-				"remainingThreads", newThreadCount)
+			if p.executor.logger != nil {
+				p.executor.logger.Info("Thread removed",
+					"thread", th.name,
+					"reason", reason,
+					"executions", tc,
+					"idleTime", now.Sub(lu),
+					"remainingThreads", newThreadCount)
+			}
 		}(info.thread, taskCount, lastUsed)
 	}
 
 	// Phase 4: Create replacement threads if needed (asynchronous)
 	if newThreadCount < p.executor.options.minPoolSize {
 		threadsToCreate := p.executor.options.minPoolSize - newThreadCount
-		p.executor.logger.Info("Creating threads to maintain minimum pool size",
-			"currentThreads", newThreadCount,
-			"minPoolSize", p.executor.options.minPoolSize,
-			"threadsToCreate", threadsToCreate)
+		if p.executor.logger != nil {
+			p.executor.logger.Info("Creating threads to maintain minimum pool size",
+				"currentThreads", newThreadCount,
+				"minPoolSize", p.executor.options.minPoolSize,
+				"threadsToCreate", threadsToCreate)
+		}
 
 		for i := uint32(0); i < threadsToCreate; i++ {
 			go func() {
 				if _, err := p.createThread(); err != nil {
-					p.executor.logger.Error("Failed to create replacement thread", "error", err)
+					if p.executor.logger != nil {
+						p.executor.logger.Error("Failed to create replacement thread", "error", err)
+					}
 				}
 			}()
 		}

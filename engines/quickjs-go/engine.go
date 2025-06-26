@@ -16,9 +16,10 @@ var rpcScript string
 
 // Engine represents a QuickJS engine instance with its runtime, context, and options.
 type Engine struct {
-	Runtime *quickjs.Runtime // QuickJS runtime instance
-	Ctx     *quickjs.Context // QuickJS context instance
-	Option  *EngineOption    // Engine configuration options
+	Runtime   *quickjs.Runtime // QuickJS runtime instance
+	Ctx       *quickjs.Context // QuickJS context instance
+	Option    *EngineOption    // Engine configuration options
+	RpcScript string           // Embedded RPC script for executing requests
 }
 
 // Init executes the provided initialization scripts in the engine context.
@@ -50,7 +51,7 @@ func (e *Engine) Execute(req *jsexecutor.JsRequest) (*jsexecutor.JsResponse, err
 	}
 
 	// Evaluate the RPC script to get the function
-	fn := e.Ctx.Eval(rpcScript, quickjs.EvalFileName("engine_rpc.js"))
+	fn := e.Ctx.Eval(e.RpcScript, quickjs.EvalFileName("engine_rpc.js"))
 	defer fn.Free()
 	if fn.IsException() {
 		return nil, fmt.Errorf("failed to evaluate RPC script: %w", e.Ctx.Exception())
@@ -94,7 +95,7 @@ func (e *Engine) Close() error {
 
 // NewEngine creates a new QuickJS engine instance with the given options.
 // It initializes the runtime, context, and applies all provided engine options.
-func NewEngine(options ...jsexecutor.JsEngineOption) (*Engine, error) {
+func newEngine(options ...Option) (*Engine, error) {
 	// Create QuickJS runtime
 	rt := quickjs.NewRuntime()
 	if rt == nil {
@@ -121,6 +122,7 @@ func NewEngine(options ...jsexecutor.JsEngineOption) (*Engine, error) {
 			EnableModuleImport: false, // Module import disabled by default
 			Strip:              1,     // Default strip behavior
 		},
+		RpcScript: rpcScript, // Use embedded RPC script
 	}
 
 	// Apply additional engine options
@@ -132,4 +134,10 @@ func NewEngine(options ...jsexecutor.JsEngineOption) (*Engine, error) {
 	}
 
 	return engine, nil
+}
+
+func NewFactory(options ...Option) jsexecutor.JsEngineFactory {
+	return func() (jsexecutor.JsEngine, error) {
+		return newEngine(options...)
+	}
 }

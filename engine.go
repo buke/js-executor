@@ -24,12 +24,6 @@ type InitScript struct {
 	FileName string // Script file name for debugging purposes
 }
 
-// JsEngineBuilder creates JavaScript engine instances
-type JsEngineBuilder interface {
-	// Build creates a new JavaScript engine with the given options
-	Build(options ...JsEngineOption) (JsEngine, error)
-}
-
 // JsEngine represents a JavaScript execution engine
 type JsEngine interface {
 	// Init initializes the engine with the given scripts
@@ -45,5 +39,5 @@ type JsEngine interface {
 	Close() error
 }
 
-// JsEngineOption is a function that configures a JavaScript engine
-type JsEngineOption func(JsEngine) error
+// JsEngineFactory defines a function type for creating JavaScript engines
+type JsEngineFactory func() (JsEngine, error)
