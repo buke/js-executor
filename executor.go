@@ -8,7 +8,9 @@ import (
 	"log/slog"
 	"os"
 	"runtime"
+	"sync/atomic"
 	"time"
+	"unsafe"
 )
 
 // JsExecutorOption contains configuration options for the JavaScript executor
@@ -30,8 +32,35 @@ type JsExecutor struct {
 	pool          *pool             // Thread pool
 	engineBuilder JsEngineBuilder   // JavaScript engine builder
 	engineOptions []JsEngineOption  // Options for creating JavaScript engines
-	initScripts   []*InitJsScript   // Initialization scripts
-	logger        *slog.Logger      // Logger instance
+
+	// Use atomic pointer for lock-free, zero-copy reads of initScripts
+	initScriptsPtr unsafe.Pointer // Points to []*InitScript (atomic access)
+
+	logger *slog.Logger // Logger instance
+}
+
+// getInitScripts returns the current initialization scripts (no copy, read-only)
+func (e *JsExecutor) getInitScripts() []*InitScript {
+	ptr := atomic.LoadPointer(&e.initScriptsPtr)
+	if ptr == nil {
+		return nil
+	}
+	return *(*[]*InitScript)(ptr)
+}
+
+// setInitScripts atomically sets new initialization scripts
+func (e *JsExecutor) setInitScripts(scripts []*InitScript) {
+	if len(scripts) == 0 {
+		atomic.StorePointer(&e.initScriptsPtr, nil)
+		return
+	}
+
+	// Create immutable copy once during write
+	newScripts := make([]*InitScript, len(scripts))
+	copy(newScripts, scripts)
+
+	// Atomically replace the pointer
+	atomic.StorePointer(&e.initScriptsPtr, unsafe.Pointer(&newScripts))
 }
 
 // Start initializes and starts the executor thread pool
@@ -60,13 +89,13 @@ func (e *JsExecutor) Stop() error {
 }
 
 // Reload reloads all threads with new initialization scripts
-func (e *JsExecutor) Reload(scripts ...*InitJsScript) error {
+func (e *JsExecutor) Reload(scripts ...*InitScript) error {
 	if e.pool == nil {
 		return fmt.Errorf("thread pool is not initialized")
 	}
 
 	if len(scripts) > 0 {
-		e.initScripts = scripts
+		e.setInitScripts(scripts) // Use safe setter method
 	}
 
 	return e.pool.reload()
@@ -171,10 +200,10 @@ func (e *JsExecutor) WithThresholds(create, selectThreshold float64) func(*JsExe
 }
 
 // WithInitJsScripts configures the initialization scripts
-func (e *JsExecutor) WithInitJsScripts(scripts ...*InitJsScript) func(*JsExecutor) {
+func (e *JsExecutor) WithInitJsScripts(scripts ...*InitScript) func(*JsExecutor) {
 	return func(executor *JsExecutor) {
 		if len(scripts) > 0 {
-			executor.initScripts = scripts
+			executor.setInitScripts(scripts) // Use safe setter method
 		}
 	}
 }

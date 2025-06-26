@@ -19,7 +19,7 @@ type JsResponse struct {
 }
 
 // InitJsScript represents a JavaScript initialization script
-type InitJsScript struct {
+type InitScript struct {
 	Content  string // Script content
 	FileName string // Script file name for debugging purposes
 }
@@ -33,10 +33,10 @@ type JsEngineBuilder interface {
 // JsEngine represents a JavaScript execution engine
 type JsEngine interface {
 	// Init initializes the engine with the given scripts
-	Init(scripts []*InitJsScript) error
+	Init(scripts []*InitScript) error
 
 	// Reload reloads the engine with new scripts
-	Reload(scripts []*InitJsScript) error
+	Reload(scripts []*InitScript) error
 
 	// Execute executes a JavaScript request and returns the response
 	Execute(req *JsRequest) (*JsResponse, error)

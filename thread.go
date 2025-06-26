@@ -65,8 +65,11 @@ func (t *thread) initEngine() error {
 	}
 	t.jsEngine = jsEngine
 
+	// Get initialization scripts safely
+	scripts := t.executor.getInitScripts()
+
 	// Initialize the engine with scripts
-	if err := t.jsEngine.Init(t.executor.initScripts); err != nil {
+	if err := t.jsEngine.Init(scripts); err != nil {
 		return fmt.Errorf("failed to init JS engine: %w", err)
 	}
 
@@ -163,7 +166,10 @@ func (t *thread) executeAction(req *threadActionRequest) {
 
 	case actionReload:
 		t.executor.logger.Info("Thread starting reload", "thread", t.name)
-		err := t.jsEngine.Reload(t.executor.initScripts)
+
+		// Get initialization scripts safely
+		scripts := t.executor.getInitScripts()
+		err := t.jsEngine.Reload(scripts)
 		req.done <- err
 
 		if err != nil {
