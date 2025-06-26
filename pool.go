@@ -19,6 +19,7 @@ type pool struct {
 	sync.RWMutex                       // Read-write mutex for thread map access
 	executor        *JsExecutor        // Reference to the parent executor
 	threads         map[uint32]*thread // Map of thread ID to thread instance
+	threadCount     uint32             // Atomic: current number of threads in the pool
 	roundRobinList  []uint32           // List of thread IDs for round-robin selection
 	roundRobinIndex uint32             // Current index for round-robin selection (atomic)
 	threadIdCounter uint32             // Counter for generating unique thread IDs (atomic)
@@ -40,6 +41,7 @@ func newPool(e *JsExecutor) *pool {
 		roundRobinIndex: 0,
 		threadIdCounter: 0,
 		stopCleanup:     make(chan struct{}),
+		threadCount:     0,
 	}
 }
 
@@ -75,17 +77,21 @@ func (p *pool) stop() error {
 	// Clear the thread collections
 	p.threads = make(map[uint32]*thread)
 	p.roundRobinList = make([]uint32, 0)
+	atomic.StoreUint32(&p.threadCount, 0)
 	return nil
 }
 
-// createThread creates and starts a new thread
+// createThread creates and starts a new thread with atomic thread count control
 func (p *pool) createThread() (*thread, error) {
+	newCount := atomic.AddUint32(&p.threadCount, 1)
+	if newCount > p.executor.options.maxPoolSize {
+		atomic.AddUint32(&p.threadCount, ^uint32(0)) // -1
+		return nil, fmt.Errorf("max pool size reached")
+	}
+
 	threadId := atomic.AddUint32(&p.threadIdCounter, 1)
 
-	t, err := newThread(p.executor, "thread-"+strconv.FormatUint(uint64(threadId), 10), threadId)
-	if err != nil {
-		return nil, err
-	}
+	t := newThread(p.executor, "thread-"+strconv.FormatUint(uint64(threadId), 10), threadId)
 
 	// Start the thread goroutine
 	go t.run()
@@ -94,13 +100,12 @@ func (p *pool) createThread() (*thread, error) {
 	p.Lock()
 	p.threads[threadId] = t
 	p.roundRobinList = append(p.roundRobinList, threadId)
-	currentThreadCount := uint32(len(p.threads))
 	p.Unlock()
 
 	if p.executor.logger != nil {
 		p.executor.logger.Info("Thread created",
 			"thread", t.name,
-			"totalThreads", currentThreadCount)
+			"totalThreads", atomic.LoadUint32(&p.threadCount))
 	}
 
 	return t, nil
@@ -149,6 +154,7 @@ func (p *pool) selectThread(req *JsRequest) *thread {
 
 // getOrCreateThread gets an existing thread or creates a new one if needed
 func (p *pool) getOrCreateThread(req *JsRequest) (*thread, error) {
+
 	// Try to get an existing thread first
 	if t := p.selectThread(req); t != nil {
 		queueThreshold := int(float64(p.executor.options.queueSize) * p.executor.options.createThreshold)
@@ -157,19 +163,17 @@ func (p *pool) getOrCreateThread(req *JsRequest) (*thread, error) {
 		}
 	}
 
-	// Check if we can create a new thread
-	p.RLock()
-	currentThreadCount := uint32(len(p.threads))
-	p.RUnlock()
-
+	// Use atomic threadCount for concurrency safety
+	currentThreadCount := atomic.LoadUint32(&p.threadCount)
 	if currentThreadCount < p.executor.options.maxPoolSize {
 		if p.executor.logger != nil {
 			p.executor.logger.Info("Creating new thread due to high load",
 				"currentThreads", currentThreadCount,
 				"maxPoolSize", p.executor.options.maxPoolSize)
 		}
-		return p.createThread()
-
+		if t, err := p.createThread(); err == nil {
+			return t, nil
+		}
 	}
 
 	// At max capacity, return an existing thread
@@ -209,8 +213,8 @@ func (p *pool) execute(task *task) (*JsResponse, error) {
 
 // reload reloads all threads with new scripts
 func (p *pool) reload() error {
-	p.RLock()
-	defer p.RUnlock()
+	p.Lock()
+	defer p.Unlock()
 
 	for _, t := range p.threads {
 		if err := t.reload(); err != nil {
@@ -276,7 +280,7 @@ func (p *pool) performCleanup() {
 
 	// Phase 1: Collect information about threads to remove (read lock)
 	p.RLock()
-	currentThreadCount := uint32(len(p.threads))
+	currentThreadCount := atomic.LoadUint32(&p.threadCount)
 	if currentThreadCount <= p.executor.options.minPoolSize {
 		p.RUnlock()
 		return
@@ -309,9 +313,10 @@ func (p *pool) performCleanup() {
 			delete(p.threads, info.id)
 			p.removeThreadFromRoundRobin(info.id)
 			actualRemovedCount++
+			atomic.AddUint32(&p.threadCount, ^uint32(0)) // -1 for each removed thread
 		}
 	}
-	newThreadCount := uint32(len(p.threads))
+	newThreadCount := atomic.LoadUint32(&p.threadCount)
 	p.Unlock()
 
 	// Phase 3: Stop threads asynchronously (no locks)

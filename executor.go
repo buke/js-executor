@@ -140,55 +140,10 @@ func WithJsEngine(engineFactory JsEngineFactory) func(*JsExecutor) {
 	}
 }
 
-// WithOptions configures the executor with custom options
-func WithOptions(opt *JsExecutorOption) func(*JsExecutor) {
-	return func(executor *JsExecutor) {
-		if opt.minPoolSize > 0 {
-			executor.options.minPoolSize = opt.minPoolSize
-		}
-		if opt.maxPoolSize > 0 {
-			executor.options.maxPoolSize = opt.maxPoolSize
-		}
-		if opt.queueSize > 0 {
-			executor.options.queueSize = opt.queueSize
-		}
-		if opt.threadTTL > 0 {
-			executor.options.threadTTL = opt.threadTTL
-		}
-		if opt.maxExecutions > 0 {
-			executor.options.maxExecutions = opt.maxExecutions
-		}
-		if opt.enqueueTimeout > 0 {
-			executor.options.enqueueTimeout = opt.enqueueTimeout
-		}
-		if opt.executeTimeout > 0 {
-			executor.options.executeTimeout = opt.executeTimeout
-		}
-		if opt.createThreshold > 0 && opt.createThreshold <= 1.0 {
-			executor.options.createThreshold = opt.createThreshold
-		}
-		if opt.selectThreshold > 0 && opt.selectThreshold <= 1.0 {
-			executor.options.selectThreshold = opt.selectThreshold
-		}
-	}
-}
-
 // WithLogger configures the logger for the executor
 func WithLogger(logger *slog.Logger) func(*JsExecutor) {
 	return func(executor *JsExecutor) {
 		executor.logger = logger
-	}
-}
-
-// WithThresholds configures the load thresholds for thread management
-func WithThresholds(create, selectThreshold float64) func(*JsExecutor) {
-	return func(executor *JsExecutor) {
-		if create > 0 && create <= 1.0 {
-			executor.options.createThreshold = create
-		}
-		if selectThreshold > 0 && selectThreshold <= 1.0 {
-			executor.options.selectThreshold = selectThreshold
-		}
 	}
 }
 
@@ -197,6 +152,77 @@ func WithInitScripts(scripts ...*InitScript) func(*JsExecutor) {
 	return func(executor *JsExecutor) {
 		if len(scripts) > 0 {
 			executor.setInitScripts(scripts) // Use safe setter method
+		}
+	}
+}
+
+func WithMinPoolSize(size uint32) func(*JsExecutor) {
+	return func(executor *JsExecutor) {
+		if size > 0 {
+			executor.options.minPoolSize = size
+		}
+	}
+}
+func WithMaxPoolSize(size uint32) func(*JsExecutor) {
+	return func(executor *JsExecutor) {
+		if size > 0 {
+			executor.options.maxPoolSize = size
+		}
+	}
+}
+
+func WithQueueSize(size uint32) func(*JsExecutor) {
+	return func(executor *JsExecutor) {
+		if size > 0 {
+			executor.options.queueSize = size
+		}
+	}
+}
+
+func WithThreadTTL(ttl time.Duration) func(*JsExecutor) {
+	return func(executor *JsExecutor) {
+		if ttl > 0 {
+			executor.options.threadTTL = ttl
+		}
+	}
+}
+
+func WithMaxExecutions(max uint32) func(*JsExecutor) {
+	return func(executor *JsExecutor) {
+		if max > 0 {
+			executor.options.maxExecutions = max
+		}
+	}
+}
+
+func WithEnqueueTimeout(timeout time.Duration) func(*JsExecutor) {
+	return func(executor *JsExecutor) {
+		if timeout > 0 {
+			executor.options.enqueueTimeout = timeout
+		}
+	}
+}
+
+func WithExecuteTimeout(timeout time.Duration) func(*JsExecutor) {
+	return func(executor *JsExecutor) {
+		if timeout > 0 {
+			executor.options.executeTimeout = timeout
+		}
+	}
+}
+
+func WithCreateThreshold(threshold float64) func(*JsExecutor) {
+	return func(executor *JsExecutor) {
+		if threshold > 0 && threshold <= 1.0 {
+			executor.options.createThreshold = threshold
+		}
+	}
+}
+
+func WithSelectThreshold(threshold float64) func(*JsExecutor) {
+	return func(executor *JsExecutor) {
+		if threshold > 0 && threshold <= 1.0 {
+			executor.options.selectThreshold = threshold
 		}
 	}
 }

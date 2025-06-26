@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	defaultActionTimeout = 30 * time.Second
+	defaultActionTimeout = 5 * time.Second
 )
 
 // threadAction represents an action that can be performed on a thread
@@ -44,16 +44,16 @@ type thread struct {
 }
 
 // newThread creates a new thread instance
-func newThread(executor *JsExecutor, name string, threadId uint32) (*thread, error) {
+func newThread(executor *JsExecutor, name string, threadId uint32) *thread {
 	return &thread{
 		executor:     executor,
 		name:         name,
 		threadId:     threadId,
 		taskQueue:    make(chan *task, executor.options.queueSize),
-		actionQueue:  make(chan *threadActionRequest, 2), // Buffer for stop and reload actions
+		actionQueue:  make(chan *threadActionRequest, 1),
 		lastUsedNano: time.Now().UnixNano(),
 		taskID:       0,
-	}, nil
+	}
 }
 
 // initEngine initializes the JavaScript engine for this thread
@@ -282,6 +282,5 @@ func (t *thread) getTaskCount() uint32 {
 
 // getLastUsed returns the timestamp of the last task execution (thread-safe)
 func (t *thread) getLastUsed() time.Time {
-	nano := atomic.LoadInt64(&t.lastUsedNano)
-	return time.Unix(0, nano)
+	return time.Unix(0, atomic.LoadInt64(&t.lastUsedNano))
 }

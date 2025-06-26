@@ -59,8 +59,8 @@ func (e *Engine) Execute(req *jsexecutor.JsRequest) (*jsexecutor.JsResponse, err
 
 	// Marshal the request to a JS value
 	jsReq, err := e.Ctx.Marshal(req)
-	defer jsReq.Free()
 	if err != nil {
+		defer jsReq.Free()
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
@@ -98,16 +98,9 @@ func (e *Engine) Close() error {
 func newEngine(options ...Option) (*Engine, error) {
 	// Create QuickJS runtime
 	rt := quickjs.NewRuntime()
-	if rt == nil {
-		return nil, fmt.Errorf("failed to create QuickJS runtime")
-	}
 
 	// Create QuickJS context
 	ctx := rt.NewContext()
-	if ctx == nil {
-		rt.Close()
-		return nil, fmt.Errorf("failed to create QuickJS context")
-	}
 
 	// Create engine instance with default options
 	engine := &Engine{
