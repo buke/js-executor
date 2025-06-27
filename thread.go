@@ -10,17 +10,27 @@ import (
 	"time"
 )
 
-const (
-	defaultActionTimeout = 5 * time.Second
-)
-
 // threadAction represents an action that can be performed on a thread
 type threadAction int
 
 const (
 	actionStop   threadAction = iota // Stop the thread
 	actionReload                     // Reload the thread's JavaScript engine
+	actionRetire                     // Retire the thread
 )
+
+func (a threadAction) String() string {
+	switch a {
+	case actionStop:
+		return "stop"
+	case actionReload:
+		return "reload"
+	case actionRetire:
+		return "retire"
+	default:
+		return "unknown"
+	}
+}
 
 // threadActionRequest represents a request to perform an action on a thread
 type threadActionRequest struct {
@@ -54,6 +64,16 @@ func newThread(executor *JsExecutor, name string, threadId uint32) *thread {
 		lastUsedNano: time.Now().UnixNano(),
 		taskID:       0,
 	}
+}
+
+// getTaskCount returns the number of tasks executed by this thread (thread-safe)
+func (t *thread) getTaskCount() uint32 {
+	return atomic.LoadUint32(&t.taskID)
+}
+
+// getLastUsed returns the timestamp of the last task execution (thread-safe)
+func (t *thread) getLastUsed() time.Time {
+	return time.Unix(0, atomic.LoadInt64(&t.lastUsedNano))
 }
 
 // initEngine initializes the JavaScript engine for this thread
@@ -124,30 +144,37 @@ func (t *thread) run() {
 				return // Channel closed, exit
 			}
 			t.executeTask(task)
-
+			if t.checkAndRetireIfNeeded() {
+				if t.executor.logger != nil {
+					t.executor.logger.Info("Thread reached max executions, retiring",
+						"thread", t.name,
+						"taskCount", t.getTaskCount(),
+					)
+				}
+				t.notifyPoolReplenish()
+				return // Exit after retirement
+			}
 		case actionReq := <-t.actionQueue:
-			switch actionReq.action {
-			case actionStop:
-				// Handle stop immediately, cancel any pending action
+			if len(t.taskQueue) == 0 {
 				if pendingAction != nil {
 					pendingAction.done <- fmt.Errorf("thread is shutting down")
 				}
 				t.executeAction(actionReq)
-				return
-
-			case actionReload:
-				// Handle reload when queue is empty
-				if len(t.taskQueue) == 0 {
-					t.executeAction(actionReq)
-				} else {
-					pendingAction = actionReq
-					if t.executor.logger != nil {
-						t.executor.logger.Info("Reload request received, waiting for queue to empty",
-							"thread", t.name,
-							"queueSize", len(t.taskQueue))
-					}
+				if actionReq.action == actionStop || actionReq.action == actionRetire {
+					return
+				}
+				// reload后继续循环
+			} else {
+				pendingAction = actionReq
+				if t.executor.logger != nil {
+					t.executor.logger.Info(
+						fmt.Sprintf("%s request received, waiting for queue to empty", actionReq.action.String()),
+						"thread", t.name,
+						"queueSize", len(t.taskQueue),
+					)
 				}
 			}
+
 		}
 	}
 }
@@ -171,7 +198,6 @@ func (t *thread) executeAction(req *threadActionRequest) {
 			}
 			t.jsEngine = nil
 		}
-
 		req.done <- nil
 
 	case actionReload:
@@ -196,6 +222,24 @@ func (t *thread) executeAction(req *threadActionRequest) {
 					"thread", t.name)
 			}
 		}
+
+	case actionRetire:
+		if t.executor.logger != nil {
+			t.executor.logger.Info("Thread retiring", "thread", t.name)
+		}
+
+		// Close the JavaScript engine
+		if t.jsEngine != nil {
+			if err := t.jsEngine.Close(); err != nil {
+				if t.executor.logger != nil {
+					t.executor.logger.Error("Failed to close JS engine",
+						"thread", t.name,
+						"error", err)
+				}
+			}
+			t.jsEngine = nil
+		}
+		req.done <- nil
 	}
 }
 
@@ -239,12 +283,8 @@ func (t *thread) reload() error {
 		done:   make(chan error, 1),
 	}
 
-	// Send reload request with timeout
-	select {
-	case t.actionQueue <- req:
-	case <-time.After(defaultActionTimeout):
-		return fmt.Errorf("timeout sending reload request to thread %s", t.name)
-	}
+	// Send reload request
+	t.actionQueue <- req
 
 	// Wait for completion
 	return <-req.done
@@ -257,15 +297,8 @@ func (t *thread) stop() {
 		done:   make(chan error, 1),
 	}
 
-	// Send stop request with timeout
-	select {
-	case t.actionQueue <- req:
-	case <-time.After(defaultActionTimeout):
-		if t.executor.logger != nil {
-			t.executor.logger.Warn("Timeout sending stop signal", "thread", t.name)
-		}
-		return
-	}
+	// Send stop request
+	t.actionQueue <- req
 
 	// Wait for completion
 	<-req.done
@@ -275,12 +308,38 @@ func (t *thread) stop() {
 	close(t.actionQueue)
 }
 
-// getTaskCount returns the number of tasks executed by this thread (thread-safe)
-func (t *thread) getTaskCount() uint32 {
-	return atomic.LoadUint32(&t.taskID)
+// retire cleans up the thread, closing its channels and releasing resources
+func (t *thread) retire() {
+	req := &threadActionRequest{
+		action: actionRetire,
+		done:   make(chan error, 1),
+	}
+
+	// Send cleanup request
+	t.actionQueue <- req
+
+	// Wait for completion
+	<-req.done
+
+	// Close channels to prevent further operations
+	close(t.taskQueue)
+	close(t.actionQueue)
 }
 
-// getLastUsed returns the timestamp of the last task execution (thread-safe)
-func (t *thread) getLastUsed() time.Time {
-	return time.Unix(0, atomic.LoadInt64(&t.lastUsedNano))
+// checkAndRetireIfNeeded checks if the thread has reached maxExecutions and retires if needed.
+func (t *thread) checkAndRetireIfNeeded() bool {
+	if t.executor.options.maxExecutions > 0 && t.getTaskCount() >= t.executor.options.maxExecutions {
+		t.notifyPoolReplenish()
+		t.retire()
+		return true
+	}
+	return false
+}
+
+// notifyPoolReplenish notifies the pool to check and replenish threads if needed.
+func (t *thread) notifyPoolReplenish() {
+	select {
+	case t.executor.pool.replenishChan <- struct{}{}:
+	default:
+	}
 }

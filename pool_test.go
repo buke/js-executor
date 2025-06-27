@@ -88,7 +88,6 @@ func TestPool_Execute(t *testing.T) {
 			minPoolSize:    1,
 			maxPoolSize:    2,
 			queueSize:      2,
-			enqueueTimeout: 1 * time.Second,
 			executeTimeout: 1 * time.Second,
 		},
 	}
@@ -216,7 +215,6 @@ func TestPool_Concurrency(t *testing.T) {
 			minPoolSize:    2,
 			maxPoolSize:    4,
 			queueSize:      2,
-			enqueueTimeout: 1 * time.Second,
 			executeTimeout: 1 * time.Second,
 		},
 	}

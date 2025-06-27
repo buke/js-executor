@@ -19,7 +19,6 @@ type JsExecutorOption struct {
 	queueSize       uint32        // Size of the task queue per thread
 	threadTTL       time.Duration // Thread time-to-live for idle cleanup
 	maxExecutions   uint32        // Maximum executions per thread before cleanup
-	enqueueTimeout  time.Duration // Timeout for enqueuing tasks
 	executeTimeout  time.Duration // Timeout for task execution
 	createThreshold float64       // Queue load threshold for creating new threads (0.0-1.0)
 	selectThreshold float64       // Queue load threshold for skipping busy threads (0.0-1.0)
@@ -111,7 +110,6 @@ func NewExecutor(opts ...func(*JsExecutor)) (*JsExecutor, error) {
 			queueSize:       256,                  // Default queue size
 			threadTTL:       0,                    // No TTL by default
 			maxExecutions:   0,                    // No execution limit by default
-			enqueueTimeout:  30 * time.Second,     // 30 second enqueue timeout
 			executeTimeout:  60 * time.Second,     // 60 second execution timeout
 			createThreshold: 0.5,                  // Create new thread at 50% load
 			selectThreshold: 0.75,                 // Skip thread at 75% load
@@ -191,14 +189,6 @@ func WithMaxExecutions(max uint32) func(*JsExecutor) {
 	return func(executor *JsExecutor) {
 		if max > 0 {
 			executor.options.maxExecutions = max
-		}
-	}
-}
-
-func WithEnqueueTimeout(timeout time.Duration) func(*JsExecutor) {
-	return func(executor *JsExecutor) {
-		if timeout > 0 {
-			executor.options.enqueueTimeout = timeout
 		}
 	}
 }

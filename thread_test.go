@@ -197,34 +197,6 @@ func TestThread_Run_PanicRecovery(t *testing.T) {
 	th.stop()
 }
 
-func TestThread_Reload_Timeout(t *testing.T) {
-	exec := &JsExecutor{
-		engineFactory: mockEngineFactory(),
-		options:       &JsExecutorOption{queueSize: 2},
-	}
-	th := newThread(exec, "t11", 11)
-	_ = th.initEngine()
-
-	// Fill actionQueue to block reload
-	th.actionQueue <- &threadActionRequest{action: actionReload, done: make(chan error, 1)}
-	err := th.reload()
-	if err == nil || err.Error() == "" {
-		t.Error("Expected timeout error on reload")
-	}
-}
-
-func TestThread_Stop_Timeout(t *testing.T) {
-	exec := &JsExecutor{
-		engineFactory: mockEngineFactory(),
-		options:       &JsExecutorOption{queueSize: 2},
-	}
-	th := newThread(exec, "t12", 12)
-	_ = th.initEngine()
-	// Fill actionQueue to block stop
-	th.actionQueue <- &threadActionRequest{action: actionReload, done: make(chan error, 1)}
-	th.stop() // Should not panic, just log timeout
-}
-
 func TestThread_Concurrent_ExecuteTask(t *testing.T) {
 	exec := &JsExecutor{
 		engineFactory: mockEngineFactory(),

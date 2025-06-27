@@ -23,7 +23,8 @@ type pool struct {
 	roundRobinList  []uint32           // List of thread IDs for round-robin selection
 	roundRobinIndex uint32             // Current index for round-robin selection (atomic)
 	threadIdCounter uint32             // Counter for generating unique thread IDs (atomic)
-	stopCleanup     chan struct{}      // Channel to signal cleanup goroutine to stop
+	stopCleanup     chan struct{}      // Chanoel to signal cleanup goroutine to stop
+	replenishChan   chan struct{}      // Channel to signal thread replenishment
 }
 
 // threadCleanupInfo holds information about a thread to be cleaned up
@@ -41,6 +42,7 @@ func newPool(e *JsExecutor) *pool {
 		roundRobinIndex: 0,
 		threadIdCounter: 0,
 		stopCleanup:     make(chan struct{}),
+		replenishChan:   make(chan struct{}, 1),
 		threadCount:     0,
 	}
 }
@@ -56,7 +58,7 @@ func (p *pool) start() error {
 
 	// Start cleanup goroutine if TTL or max executions are configured
 	if p.executor.options.threadTTL > 0 || p.executor.options.maxExecutions > 0 {
-		go p.cleanupThreads()
+		go p.retireThreads()
 	}
 
 	return nil
@@ -65,6 +67,7 @@ func (p *pool) start() error {
 // stop shuts down the thread pool and all threads
 func (p *pool) stop() error {
 	close(p.stopCleanup)
+	close(p.replenishChan)
 
 	p.Lock()
 	defer p.Unlock()
@@ -192,12 +195,8 @@ func (p *pool) execute(task *task) (*JsResponse, error) {
 		return nil, fmt.Errorf("no available thread to execute task")
 	}
 
-	// Enqueue the task with timeout
-	select {
-	case t.taskQueue <- task:
-	case <-time.After(p.executor.options.enqueueTimeout):
-		return nil, fmt.Errorf("timeout waiting for thread to accept task")
-	}
+	// Enqueue the task
+	t.taskQueue <- task
 
 	// Wait for the result with timeout
 	select {
@@ -225,8 +224,8 @@ func (p *pool) reload() error {
 	return nil
 }
 
-// cleanupThreads runs the background cleanup process
-func (p *pool) cleanupThreads() {
+// retireThreads runs the background cleanup process
+func (p *pool) retireThreads() {
 	var ticker *time.Ticker
 	if p.executor.options.threadTTL > 0 {
 		ticker = time.NewTicker(p.executor.options.threadTTL / 2)
@@ -239,6 +238,8 @@ func (p *pool) cleanupThreads() {
 		select {
 		case <-ticker.C:
 			p.performCleanup()
+		case <-p.replenishChan:
+			p.replenish()
 		case <-p.stopCleanup:
 			return
 		}
@@ -325,7 +326,7 @@ func (p *pool) performCleanup() {
 		lastUsed := info.thread.getLastUsed()
 
 		go func(th *thread, tc uint32, lu time.Time) {
-			th.stop()
+			th.retire()
 			reason := "idle timeout"
 			if p.executor.options.maxExecutions > 0 && tc >= p.executor.options.maxExecutions {
 				reason = "max executions reached"
@@ -340,25 +341,20 @@ func (p *pool) performCleanup() {
 			}
 		}(info.thread, taskCount, lastUsed)
 	}
+}
 
-	// Phase 4: Create replacement threads if needed (asynchronous)
-	if newThreadCount < p.executor.options.minPoolSize {
-		threadsToCreate := p.executor.options.minPoolSize - newThreadCount
-		if p.executor.logger != nil {
-			p.executor.logger.Info("Creating threads to maintain minimum pool size",
-				"currentThreads", newThreadCount,
-				"minPoolSize", p.executor.options.minPoolSize,
-				"threadsToCreate", threadsToCreate)
+// replenish checks if the pool needs more threads and creates them if necessary
+func (p *pool) replenish() {
+	for {
+		current := atomic.LoadUint32(&p.threadCount)
+		if current >= p.executor.options.minPoolSize {
+			break
 		}
-
-		for i := uint32(0); i < threadsToCreate; i++ {
-			go func() {
-				if _, err := p.createThread(); err != nil {
-					if p.executor.logger != nil {
-						p.executor.logger.Error("Failed to create replacement thread", "error", err)
-					}
-				}
-			}()
+		if _, err := p.createThread(); err != nil {
+			if p.executor.logger != nil {
+				p.executor.logger.Error("Failed to create replenishment thread", "error", err)
+			}
+			break
 		}
 	}
 }

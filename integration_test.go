@@ -56,7 +56,7 @@ func TestIntegration_ExecutorWithQuickJS_ConcurrentTasks(t *testing.T) {
 	defer executor.Stop()
 
 	const (
-		goroutineCount    = 4
+		goroutineCount    = 16
 		tasksPerGoroutine = 256
 		totalTasks        = goroutineCount * tasksPerGoroutine
 	)

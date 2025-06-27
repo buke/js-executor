@@ -20,7 +20,6 @@ func Example() {
 			quickjsengine.WithEnableModuleImport(true),
 			quickjsengine.WithCanBlock(true),
 		)),
-		// jsexecutor.WithLogger(nil), // Use nil for no logging
 		jsexecutor.WithInitScripts(initScript),
 	)
 	if err != nil {
