@@ -197,15 +197,23 @@ func (p *pool) execute(task *task) (*JsResponse, error) {
 	// Enqueue the task
 	t.taskQueue <- task
 
-	// Wait for the result with timeout
-	select {
-	case result := <-task.resultChan:
+	// Wait for the result, only apply timeout if executeTimeout > 0
+	if p.executor.options.executeTimeout > 0 {
+		select {
+		case result := <-task.resultChan:
+			if result.err != nil {
+				return nil, result.err
+			}
+			return result.response, nil
+		case <-time.After(p.executor.options.executeTimeout):
+			return nil, fmt.Errorf("timeout waiting for task result")
+		}
+	} else {
+		result := <-task.resultChan
 		if result.err != nil {
 			return nil, result.err
 		}
 		return result.response, nil
-	case <-time.After(p.executor.options.executeTimeout):
-		return nil, fmt.Errorf("timeout waiting for task result")
 	}
 }
 

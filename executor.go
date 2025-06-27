@@ -110,7 +110,7 @@ func NewExecutor(opts ...func(*JsExecutor)) (*JsExecutor, error) {
 			queueSize:       256,                  // Default queue size
 			threadTTL:       0,                    // No TTL by default
 			maxExecutions:   0,                    // No execution limit by default
-			executeTimeout:  60 * time.Second,     // 60 second execution timeout
+			executeTimeout:  0,                    // No execution timeout by default
 			createThreshold: 0.5,                  // Create new thread at 50% load
 			selectThreshold: 0.75,                 // Skip thread at 75% load
 		},
