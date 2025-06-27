@@ -12,7 +12,7 @@ import (
 	"unsafe"
 )
 
-// JsExecutorOption contains configuration options for the JavaScript executor
+// JsExecutorOption contains configuration options for the JavaScript executor.
 type JsExecutorOption struct {
 	minPoolSize     uint32        // Minimum number of threads in the pool
 	maxPoolSize     uint32        // Maximum number of threads in the pool
@@ -24,19 +24,19 @@ type JsExecutorOption struct {
 	selectThreshold float64       // Queue load threshold for skipping busy threads (0.0-1.0)
 }
 
-// JsExecutor manages a pool of JavaScript execution threads
+// JsExecutor manages a pool of JavaScript execution threads.
 type JsExecutor struct {
 	options       *JsExecutorOption // Configuration options
 	pool          *pool             // Thread pool
 	engineFactory JsEngineFactory   // JavaScript engine factory function
 
-	// Use atomic pointer for lock-free, zero-copy reads of initScripts
+	// Use atomic pointer for lock-free, zero-copy reads of initScripts.
 	initScriptsPtr unsafe.Pointer // Points to []*InitScript (atomic access)
 
 	logger *slog.Logger // Logger instance
 }
 
-// getInitScripts returns the current initialization scripts (no copy, read-only)
+// getInitScripts returns the current initialization scripts (no copy, read-only).
 func (e *JsExecutor) getInitScripts() []*InitScript {
 	ptr := atomic.LoadPointer(&e.initScriptsPtr)
 	if ptr == nil {
@@ -45,22 +45,22 @@ func (e *JsExecutor) getInitScripts() []*InitScript {
 	return *(*[]*InitScript)(ptr)
 }
 
-// setInitScripts atomically sets new initialization scripts
+// setInitScripts atomically sets new initialization scripts.
 func (e *JsExecutor) setInitScripts(scripts []*InitScript) {
 	if len(scripts) == 0 {
 		atomic.StorePointer(&e.initScriptsPtr, nil)
 		return
 	}
 
-	// Create immutable copy once during write
+	// Create immutable copy once during write.
 	newScripts := make([]*InitScript, len(scripts))
 	copy(newScripts, scripts)
 
-	// Atomically replace the pointer
+	// Atomically replace the pointer.
 	atomic.StorePointer(&e.initScriptsPtr, unsafe.Pointer(&newScripts))
 }
 
-// Start initializes and starts the executor thread pool
+// Start initializes and starts the executor thread pool.
 func (e *JsExecutor) Start() error {
 	if e.pool == nil {
 		return fmt.Errorf("thread pool is not initialized")
@@ -68,7 +68,7 @@ func (e *JsExecutor) Start() error {
 	return e.pool.start()
 }
 
-// Execute executes a JavaScript request and returns the response
+// Execute executes a JavaScript request and returns the response.
 func (e *JsExecutor) Execute(request *JsRequest) (*JsResponse, error) {
 	if e.pool == nil {
 		return nil, fmt.Errorf("thread pool is not initialized")
@@ -77,7 +77,7 @@ func (e *JsExecutor) Execute(request *JsRequest) (*JsResponse, error) {
 	return e.pool.execute(task)
 }
 
-// Stop stops the executor and shuts down all threads
+// Stop stops the executor and shuts down all threads.
 func (e *JsExecutor) Stop() error {
 	if e.pool == nil {
 		return fmt.Errorf("thread pool is not initialized")
@@ -85,20 +85,20 @@ func (e *JsExecutor) Stop() error {
 	return e.pool.stop()
 }
 
-// Reload reloads all threads with new initialization scripts
+// Reload reloads all threads with new initialization scripts.
 func (e *JsExecutor) Reload(scripts ...*InitScript) error {
 	if e.pool == nil {
 		return fmt.Errorf("thread pool is not initialized")
 	}
 
 	if len(scripts) > 0 {
-		e.setInitScripts(scripts) // Use safe setter method
+		e.setInitScripts(scripts) // Use safe setter method.
 	}
 
 	return e.pool.reload()
 }
 
-// NewExecutor creates a new JavaScript executor with the given options
+// NewExecutor creates a new JavaScript executor with the given options.
 func NewExecutor(opts ...func(*JsExecutor)) (*JsExecutor, error) {
 	cpuCount := runtime.GOMAXPROCS(0)
 
@@ -116,12 +116,12 @@ func NewExecutor(opts ...func(*JsExecutor)) (*JsExecutor, error) {
 		},
 	}
 
-	// Apply configuration options
+	// Apply configuration options.
 	for _, opt := range opts {
 		opt(executor)
 	}
 
-	// JavaScript engine factory is required
+	// JavaScript engine factory is required.
 	if executor.engineFactory == nil {
 		return nil, fmt.Errorf("JavaScript engine factory or factory must be provided")
 	}
@@ -131,29 +131,30 @@ func NewExecutor(opts ...func(*JsExecutor)) (*JsExecutor, error) {
 	return executor, nil
 }
 
-// WithJsEngine configures the JavaScript engine builder and options
+// WithJsEngine configures the JavaScript engine builder and options.
 func WithJsEngine(engineFactory JsEngineFactory) func(*JsExecutor) {
 	return func(executor *JsExecutor) {
 		executor.engineFactory = engineFactory
 	}
 }
 
-// WithLogger configures the logger for the executor
+// WithLogger configures the logger for the executor.
 func WithLogger(logger *slog.Logger) func(*JsExecutor) {
 	return func(executor *JsExecutor) {
 		executor.logger = logger
 	}
 }
 
-// WithInitJsScripts configures the initialization scripts
+// WithInitScripts configures the initialization scripts.
 func WithInitScripts(scripts ...*InitScript) func(*JsExecutor) {
 	return func(executor *JsExecutor) {
 		if len(scripts) > 0 {
-			executor.setInitScripts(scripts) // Use safe setter method
+			executor.setInitScripts(scripts) // Use safe setter method.
 		}
 	}
 }
 
+// WithMinPoolSize sets the minimum number of threads in the pool.
 func WithMinPoolSize(size uint32) func(*JsExecutor) {
 	return func(executor *JsExecutor) {
 		if size > 0 {
@@ -161,6 +162,8 @@ func WithMinPoolSize(size uint32) func(*JsExecutor) {
 		}
 	}
 }
+
+// WithMaxPoolSize sets the maximum number of threads in the pool.
 func WithMaxPoolSize(size uint32) func(*JsExecutor) {
 	return func(executor *JsExecutor) {
 		if size > 0 {
@@ -169,6 +172,7 @@ func WithMaxPoolSize(size uint32) func(*JsExecutor) {
 	}
 }
 
+// WithQueueSize sets the size of the task queue per thread.
 func WithQueueSize(size uint32) func(*JsExecutor) {
 	return func(executor *JsExecutor) {
 		if size > 0 {
@@ -177,6 +181,7 @@ func WithQueueSize(size uint32) func(*JsExecutor) {
 	}
 }
 
+// WithThreadTTL sets the time-to-live for idle threads.
 func WithThreadTTL(ttl time.Duration) func(*JsExecutor) {
 	return func(executor *JsExecutor) {
 		if ttl > 0 {
@@ -185,6 +190,7 @@ func WithThreadTTL(ttl time.Duration) func(*JsExecutor) {
 	}
 }
 
+// WithMaxExecutions sets the maximum executions per thread before cleanup.
 func WithMaxExecutions(max uint32) func(*JsExecutor) {
 	return func(executor *JsExecutor) {
 		if max > 0 {
@@ -193,6 +199,7 @@ func WithMaxExecutions(max uint32) func(*JsExecutor) {
 	}
 }
 
+// WithExecuteTimeout sets the timeout for task execution.
 func WithExecuteTimeout(timeout time.Duration) func(*JsExecutor) {
 	return func(executor *JsExecutor) {
 		if timeout > 0 {
@@ -201,6 +208,7 @@ func WithExecuteTimeout(timeout time.Duration) func(*JsExecutor) {
 	}
 }
 
+// WithCreateThreshold sets the queue load threshold for creating new threads.
 func WithCreateThreshold(threshold float64) func(*JsExecutor) {
 	return func(executor *JsExecutor) {
 		if threshold > 0 && threshold <= 1.0 {
@@ -209,6 +217,7 @@ func WithCreateThreshold(threshold float64) func(*JsExecutor) {
 	}
 }
 
+// WithSelectThreshold sets the queue load threshold for skipping busy threads.
 func WithSelectThreshold(threshold float64) func(*JsExecutor) {
 	return func(executor *JsExecutor) {
 		if threshold > 0 && threshold <= 1.0 {

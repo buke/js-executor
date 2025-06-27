@@ -9,25 +9,27 @@ import (
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 )
 
 // mockEngine is a simple mock implementation of JsEngine for testing.
 type mockEngine struct {
-	mu           sync.Mutex
-	initCalled   bool
-	reloadCalled bool
-	closeCalled  bool
-	initScripts  []*InitScript
-	executedReq  *JsRequest
-	executeResp  *JsResponse
-	executeErr   error
+	mu           sync.Mutex    // Mutex for concurrent access
+	initCalled   bool          // Whether Init was called
+	reloadCalled bool          // Whether Reload was called
+	closeCalled  bool          // Whether Close was called
+	initScripts  []*InitScript // Scripts passed to Init/Reload
+	executedReq  *JsRequest    // Last executed request
+	executeResp  *JsResponse   // Response to return from Execute
+	executeErr   error         // Error to return from Execute
 
-	initFunc    func(scripts []*InitScript) error
-	reloadFunc  func(scripts []*InitScript) error
-	executeFunc func(req *JsRequest) (*JsResponse, error)
-	closeFunc   func() error
+	initFunc    func(scripts []*InitScript) error         // Custom Init behavior (if set)
+	reloadFunc  func(scripts []*InitScript) error         // Custom Reload behavior (if set)
+	executeFunc func(req *JsRequest) (*JsResponse, error) // Custom Execute behavior (if set)
+	closeFunc   func() error                              // Custom Close behavior (if set)
 }
 
+// Init mocks the initialization of the JavaScript engine.
 func (m *mockEngine) Init(scripts []*InitScript) error {
 	m.mu.Lock()
 	m.initCalled = true
@@ -38,6 +40,8 @@ func (m *mockEngine) Init(scripts []*InitScript) error {
 	}
 	return nil
 }
+
+// Reload mocks reloading the JavaScript engine with new scripts.
 func (m *mockEngine) Reload(scripts []*InitScript) error {
 	m.reloadCalled = true
 	m.initScripts = scripts
@@ -46,6 +50,8 @@ func (m *mockEngine) Reload(scripts []*InitScript) error {
 	}
 	return nil
 }
+
+// Execute mocks executing a JavaScript request.
 func (m *mockEngine) Execute(req *JsRequest) (*JsResponse, error) {
 	m.mu.Lock()
 	m.executedReq = req
@@ -55,6 +61,8 @@ func (m *mockEngine) Execute(req *JsRequest) (*JsResponse, error) {
 	}
 	return m.executeResp, m.executeErr
 }
+
+// Close mocks closing the JavaScript engine.
 func (m *mockEngine) Close() error {
 	m.closeCalled = true
 	if m.closeFunc != nil {
@@ -74,6 +82,7 @@ func mockEngineFactory() JsEngineFactory {
 	}
 }
 
+// TestJsExecutor_Start_Stop tests starting and stopping the executor.
 func TestJsExecutor_Start_Stop(t *testing.T) {
 	executor, err := NewExecutor(
 		WithJsEngine(mockEngineFactory()),
@@ -93,6 +102,7 @@ func TestJsExecutor_Start_Stop(t *testing.T) {
 	}
 }
 
+// TestJsExecutor_Execute tests executing a JavaScript request.
 func TestJsExecutor_Execute(t *testing.T) {
 	executor, err := NewExecutor(
 		WithJsEngine(mockEngineFactory()),
@@ -119,6 +129,7 @@ func TestJsExecutor_Execute(t *testing.T) {
 	}
 }
 
+// TestJsExecutor_Reload tests reloading initialization scripts.
 func TestJsExecutor_Reload(t *testing.T) {
 	executor, err := NewExecutor(
 		WithJsEngine(mockEngineFactory()),
@@ -143,6 +154,7 @@ func TestJsExecutor_Reload(t *testing.T) {
 	}
 }
 
+// TestJsExecutor_WithLogger tests setting a custom logger.
 func TestJsExecutor_WithLogger(t *testing.T) {
 	logger := slog.Default()
 	executor, err := NewExecutor(
@@ -157,6 +169,7 @@ func TestJsExecutor_WithLogger(t *testing.T) {
 	}
 }
 
+// TestJsExecutor_WithThresholds tests setting create and select thresholds.
 func TestJsExecutor_WithThresholds(t *testing.T) {
 	executor, err := NewExecutor(
 		WithJsEngine(mockEngineFactory()),
@@ -171,6 +184,7 @@ func TestJsExecutor_WithThresholds(t *testing.T) {
 	}
 }
 
+// TestJsExecutor_WithInitScripts tests setting initialization scripts via option.
 func TestJsExecutor_WithInitScripts(t *testing.T) {
 	scripts := []*InitScript{
 		{FileName: "init.js", Content: "var x = 1;"},
@@ -188,6 +202,49 @@ func TestJsExecutor_WithInitScripts(t *testing.T) {
 	}
 }
 
+// TestJsExecutor_WithThreadTTL tests setting the thread time-to-live option.
+func TestJsExecutor_WithThreadTTL(t *testing.T) {
+	executor, err := NewExecutor(
+		WithJsEngine(mockEngineFactory()),
+		WithThreadTTL(10*time.Second),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create executor: %v", err)
+	}
+	if executor.options.threadTTL != 10*time.Second {
+		t.Errorf("threadTTL not set correctly, got: %v, want: %v", executor.options.threadTTL, 10*time.Second)
+	}
+}
+
+// TestJsExecutor_WithMaxExecutions tests setting the maxExecutions option.
+func TestJsExecutor_WithMaxExecutions(t *testing.T) {
+	executor, err := NewExecutor(
+		WithJsEngine(mockEngineFactory()),
+		WithMaxExecutions(123),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create executor: %v", err)
+	}
+	if executor.options.maxExecutions != 123 {
+		t.Errorf("maxExecutions not set correctly, got: %v, want: %v", executor.options.maxExecutions, 123)
+	}
+}
+
+// TestJsExecutor_WithExecuteTimeout tests setting the executeTimeout option.
+func TestJsExecutor_WithExecuteTimeout(t *testing.T) {
+	executor, err := NewExecutor(
+		WithJsEngine(mockEngineFactory()),
+		WithExecuteTimeout(5*time.Second),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create executor: %v", err)
+	}
+	if executor.options.executeTimeout != 5*time.Second {
+		t.Errorf("executeTimeout not set correctly, got: %v, want: %v", executor.options.executeTimeout, 5*time.Second)
+	}
+}
+
+// TestJsExecutor_Execute_ErrorWhenPoolNotStarted tests error when executing without starting the pool.
 func TestJsExecutor_Execute_ErrorWhenPoolNotStarted(t *testing.T) {
 	executor := &JsExecutor{}
 	_, err := executor.Execute(&JsRequest{Id: "1"})
@@ -196,6 +253,7 @@ func TestJsExecutor_Execute_ErrorWhenPoolNotStarted(t *testing.T) {
 	}
 }
 
+// TestJsExecutor_Reload_ErrorWhenPoolNotStarted tests error when reloading without starting the pool.
 func TestJsExecutor_Reload_ErrorWhenPoolNotStarted(t *testing.T) {
 	executor := &JsExecutor{}
 	err := executor.Reload(&InitScript{FileName: "a.js", Content: "var a = 1;"})
@@ -204,6 +262,7 @@ func TestJsExecutor_Reload_ErrorWhenPoolNotStarted(t *testing.T) {
 	}
 }
 
+// TestJsExecutor_Stop_ErrorWhenPoolNotStarted tests error when stopping without starting the pool.
 func TestJsExecutor_Stop_ErrorWhenPoolNotStarted(t *testing.T) {
 	executor := &JsExecutor{}
 	err := executor.Stop()
@@ -212,6 +271,7 @@ func TestJsExecutor_Stop_ErrorWhenPoolNotStarted(t *testing.T) {
 	}
 }
 
+// TestJsExecutor_Start_ErrorWhenPoolNotInitialized tests error when starting without initializing the pool.
 func TestJsExecutor_Start_ErrorWhenPoolNotInitialized(t *testing.T) {
 	executor := &JsExecutor{}
 	err := executor.Start()
@@ -220,7 +280,7 @@ func TestJsExecutor_Start_ErrorWhenPoolNotInitialized(t *testing.T) {
 	}
 }
 
-// Test error propagation from engine
+// TestJsExecutor_EngineErrorPropagation tests error propagation from the engine.
 func TestJsExecutor_EngineErrorPropagation(t *testing.T) {
 	engine := &mockEngine{
 		executeErr: errors.New("mock execute error"),
@@ -241,7 +301,7 @@ func TestJsExecutor_EngineErrorPropagation(t *testing.T) {
 	}
 }
 
-// Test NewExecutor with nil engine factory
+// TestNewExecutor_ErrorWhenNoEngineFactory tests error when no engine factory is provided.
 func TestNewExecutor_ErrorWhenNoEngineFactory(t *testing.T) {
 	_, err := NewExecutor()
 	if err == nil {
@@ -249,6 +309,7 @@ func TestNewExecutor_ErrorWhenNoEngineFactory(t *testing.T) {
 	}
 }
 
+// TestJsExecutor_SetInitScripts_EmptyScripts tests setting and clearing init scripts.
 func TestJsExecutor_SetInitScripts_EmptyScripts(t *testing.T) {
 	executor, err := NewExecutor(
 		WithJsEngine(mockEngineFactory()),
@@ -269,6 +330,7 @@ func TestJsExecutor_SetInitScripts_EmptyScripts(t *testing.T) {
 	}
 }
 
+// TestJsExecutor_WithInitScripts_Empty tests WithInitScripts with no scripts.
 func TestJsExecutor_WithInitScripts_Empty(t *testing.T) {
 	executor, err := NewExecutor(
 		WithJsEngine(mockEngineFactory()),
@@ -284,6 +346,7 @@ func TestJsExecutor_WithInitScripts_Empty(t *testing.T) {
 	}
 }
 
+// TestJsExecutor_ConcurrentReloadAndExecute tests concurrent reload and execute calls.
 func TestJsExecutor_ConcurrentReloadAndExecute(t *testing.T) {
 	executor, _ := NewExecutor(WithJsEngine(mockEngineFactory()))
 	_ = executor.Start()

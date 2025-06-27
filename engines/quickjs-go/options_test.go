@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestWithGCThreshold tests the WithGCThreshold option for normal, disable, and invalid values.
 func TestWithGCThreshold(t *testing.T) {
 	engine, err := newEngine()
 	require.NoError(t, err)
@@ -29,6 +30,7 @@ func TestWithGCThreshold(t *testing.T) {
 	require.Error(t, err)
 }
 
+// TestWithMemoryLimit tests the WithMemoryLimit option for normal and zero (no limit) values.
 func TestWithMemoryLimit(t *testing.T) {
 	engine, err := newEngine()
 	require.NoError(t, err)
@@ -44,6 +46,7 @@ func TestWithMemoryLimit(t *testing.T) {
 	require.Equal(t, uint64(0), engine.Option.MemoryLimit)
 }
 
+// TestWithTimeout tests the WithTimeout option for normal and zero (no timeout) values.
 func TestWithTimeout(t *testing.T) {
 	engine, err := newEngine()
 	require.NoError(t, err)
@@ -59,6 +62,7 @@ func TestWithTimeout(t *testing.T) {
 	require.Equal(t, uint64(0), engine.Option.Timeout)
 }
 
+// TestWithMaxStackSize tests the WithMaxStackSize option for normal and zero (default) values.
 func TestWithMaxStackSize(t *testing.T) {
 	engine, err := newEngine()
 	require.NoError(t, err)
@@ -74,6 +78,7 @@ func TestWithMaxStackSize(t *testing.T) {
 	require.Equal(t, uint64(0), engine.Option.MaxStackSize)
 }
 
+// TestWithCanBlock tests the WithCanBlock option for enabling and disabling blocking.
 func TestWithCanBlock(t *testing.T) {
 	engine, err := newEngine()
 	require.NoError(t, err)
@@ -88,6 +93,7 @@ func TestWithCanBlock(t *testing.T) {
 	require.Equal(t, false, engine.Option.CanBlock)
 }
 
+// TestWithEnableModuleImport tests the WithEnableModuleImport option for enabling and disabling ES6 module import.
 func TestWithEnableModuleImport(t *testing.T) {
 	engine, err := newEngine()
 	require.NoError(t, err)
@@ -102,6 +108,7 @@ func TestWithEnableModuleImport(t *testing.T) {
 	require.Equal(t, false, engine.Option.EnableModuleImport)
 }
 
+// TestWithStrip tests the WithStrip option for valid and invalid strip levels.
 func TestWithStrip(t *testing.T) {
 	engine, err := newEngine()
 	require.NoError(t, err)
@@ -126,6 +133,7 @@ func TestWithStrip(t *testing.T) {
 	require.Error(t, err)
 }
 
+// TestWithRpcScript tests the WithRpcScript option for valid and invalid (empty) script values.
 func TestWithRpcScript(t *testing.T) {
 	engine, err := newEngine()
 	require.NoError(t, err)

@@ -7,15 +7,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Integration test: create a JsExecutor with QuickJS engine and run a full JS workflow.
+// TestIntegration_QuickJSExecutor performs an integration test for JsExecutor with the QuickJS engine.
+// It verifies that the executor can be created, started, execute a JS function, and stopped successfully.
 func TestIntegration_QuickJSExecutor(t *testing.T) {
-	// Prepare an init script that defines a JS function
+	// Prepare an initialization script that defines a JS function
 	initScript := &jsexecutor.InitScript{
 		FileName: "hello.js",
 		Content:  `function hello(name) { return "Hello, " + name + "!"; }`,
 	}
 
-	// Create a JsExecutor with QuickJS engine and the init script
+	// Create a JsExecutor with the QuickJS engine and the initialization script
 	executor, err := jsexecutor.NewExecutor(
 		jsexecutor.WithJsEngine(NewFactory(
 			WithEnableModuleImport(true),
@@ -37,7 +38,7 @@ func TestIntegration_QuickJSExecutor(t *testing.T) {
 		Args:    []interface{}{"Integration"},
 	}
 
-	// Execute the JS request
+	// Execute the JS request and verify the result
 	resp, err := executor.Execute(req)
 	require.NoError(t, err)
 	require.NotNil(t, resp)

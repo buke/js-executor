@@ -7,14 +7,16 @@ import (
 	quickjsengine "github.com/buke/js-executor/engines/quickjs-go"
 )
 
+// Example demonstrates how to use JsExecutor with QuickJS engine.
+// It shows how to initialize the executor, start it, execute a simple JS function, and stop the executor.
 func Example() {
-	// Prepare a simple JS function as init script
+	// Prepare a simple JS function as an initialization script
 	initScript := &jsexecutor.InitScript{
 		FileName: "hello.js",
 		Content:  `function hello(name) { return "Hello, " + name + "!"; }`,
 	}
 
-	// Create a QuickJS engine builder
+	// Create a QuickJS engine builder and a new executor with the init script
 	executor, err := jsexecutor.NewExecutor(
 		jsexecutor.WithJsEngine(quickjsengine.NewFactory(
 			quickjsengine.WithEnableModuleImport(true),

@@ -93,7 +93,7 @@ func (e *Engine) Close() error {
 	return nil
 }
 
-// NewEngine creates a new QuickJS engine instance with the given options.
+// newEngine creates a new QuickJS engine instance with the given options.
 // It initializes the runtime, context, and applies all provided engine options.
 func newEngine(options ...Option) (*Engine, error) {
 	// Create QuickJS runtime
@@ -115,7 +115,7 @@ func newEngine(options ...Option) (*Engine, error) {
 			EnableModuleImport: false, // Module import disabled by default
 			Strip:              1,     // Default strip behavior
 		},
-		RpcScript: rpcScript, // Use embedded RPC script
+		RpcScript: rpcScript, // Use embedded RpcScript
 	}
 
 	// Apply additional engine options
@@ -129,6 +129,7 @@ func newEngine(options ...Option) (*Engine, error) {
 	return engine, nil
 }
 
+// NewFactory returns a JsEngineFactory that creates QuickJS engines with the given options.
 func NewFactory(options ...Option) jsexecutor.JsEngineFactory {
 	return func() (jsexecutor.JsEngine, error) {
 		return newEngine(options...)

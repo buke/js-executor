@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestEngine_Init_Success tests successful initialization of the engine with valid scripts.
 func TestEngine_Init_Success(t *testing.T) {
 	engine, err := newEngine()
 	require.NoError(t, err)
@@ -23,6 +24,7 @@ func TestEngine_Init_Success(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// TestEngine_Init_ScriptError tests initialization failure due to a syntax error in the script.
 func TestEngine_Init_ScriptError(t *testing.T) {
 	engine, err := newEngine()
 	require.NoError(t, err)
@@ -35,6 +37,7 @@ func TestEngine_Init_ScriptError(t *testing.T) {
 	require.Error(t, err)
 }
 
+// TestEngine_Reload tests reloading the engine with new scripts.
 func TestEngine_Reload(t *testing.T) {
 	engine, err := newEngine()
 	require.NoError(t, err)
@@ -51,6 +54,7 @@ func TestEngine_Reload(t *testing.T) {
 	require.NoError(t, engine.Reload(scripts2))
 }
 
+// TestEngine_Execute_Success tests successful execution of a JS request.
 func TestEngine_Execute_Success(t *testing.T) {
 	engine, err := newEngine()
 	require.NoError(t, err)
@@ -71,6 +75,7 @@ func TestEngine_Execute_Success(t *testing.T) {
 	require.NotNil(t, resp)
 }
 
+// TestEngine_Execute_Exception tests execution when the JS function throws or does not exist.
 func TestEngine_Execute_Exception(t *testing.T) {
 	engine, err := newEngine()
 	require.NoError(t, err)
@@ -90,6 +95,7 @@ func TestEngine_Execute_Exception(t *testing.T) {
 	require.Error(t, err)
 }
 
+// TestEngine_Execute_NilRequest tests execution with a nil request.
 func TestEngine_Execute_NilRequest(t *testing.T) {
 	engine, err := newEngine()
 	require.NoError(t, err)
@@ -99,6 +105,7 @@ func TestEngine_Execute_NilRequest(t *testing.T) {
 	require.Error(t, err)
 }
 
+// TestEngine_Close_Idempotent tests that closing the engine multiple times is safe.
 func TestEngine_Close_Idempotent(t *testing.T) {
 	engine, err := newEngine()
 	require.NoError(t, err)
@@ -106,6 +113,7 @@ func TestEngine_Close_Idempotent(t *testing.T) {
 	require.NoError(t, engine.Close())
 }
 
+// TestEngine_NewEngine_OptionError tests error handling when an option returns an error.
 func TestEngine_NewEngine_OptionError(t *testing.T) {
 	opt := func(e *Engine) error { return errors.New("option error") }
 	engine, err := newEngine(opt)
@@ -113,6 +121,7 @@ func TestEngine_NewEngine_OptionError(t *testing.T) {
 	require.Nil(t, engine)
 }
 
+// TestEngine_Execute_EvalRpcScriptException tests error handling when evaluating the RPC script fails.
 func TestEngine_Execute_EvalRpcScriptException(t *testing.T) {
 	engine, err := newEngine()
 	require.NoError(t, err)
@@ -133,6 +142,7 @@ func TestEngine_Execute_EvalRpcScriptException(t *testing.T) {
 	require.Contains(t, err.Error(), "failed to evaluate RPC script")
 }
 
+// TestEngine_Execute_MarshalRequestError tests error handling when marshaling the request fails.
 func TestEngine_Execute_MarshalRequestError(t *testing.T) {
 	engine, err := newEngine()
 	require.NoError(t, err)
@@ -141,7 +151,7 @@ func TestEngine_Execute_MarshalRequestError(t *testing.T) {
 	engine.RpcScript = "function rpc(req) { return req; }"
 
 	type Unmarshalable struct {
-		Ch chan int // Exported field
+		Ch chan int // Exported field that cannot be marshaled
 	}
 	req := &jsexecutor.JsRequest{
 		Id:      "1",
@@ -154,6 +164,7 @@ func TestEngine_Execute_MarshalRequestError(t *testing.T) {
 	require.Contains(t, err.Error(), "failed to marshal request")
 }
 
+// TestEngine_Execute_UnmarshalResponseError tests error handling when unmarshaling the JS response fails.
 func TestEngine_Execute_UnmarshalResponseError(t *testing.T) {
 	engine, err := newEngine()
 	require.NoError(t, err)

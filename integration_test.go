@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestIntegration_ExecutorWithQuickJS tests basic integration of JsExecutor with the QuickJS engine.
 func TestIntegration_ExecutorWithQuickJS(t *testing.T) {
 	initScript := &jsexecutor.InitScript{
 		FileName: "hello.js",
@@ -24,6 +25,7 @@ func TestIntegration_ExecutorWithQuickJS(t *testing.T) {
 
 	require.NoError(t, executor.Start())
 
+	// Prepare a request to call the "hello" function
 	req := &jsexecutor.JsRequest{
 		Id:      "1",
 		Service: "hello",
@@ -37,6 +39,7 @@ func TestIntegration_ExecutorWithQuickJS(t *testing.T) {
 	require.NoError(t, executor.Stop())
 }
 
+// TestIntegration_ExecutorWithQuickJS_ConcurrentTasks tests concurrent task execution with QuickJS engine.
 func TestIntegration_ExecutorWithQuickJS_ConcurrentTasks(t *testing.T) {
 	initScript := &jsexecutor.InitScript{
 		FileName: "hello.js",
@@ -85,6 +88,7 @@ func TestIntegration_ExecutorWithQuickJS_ConcurrentTasks(t *testing.T) {
 	}
 	wg.Wait()
 
+	// Verify all results and errors
 	for i := 0; i < totalTasks; i++ {
 		require.NoError(t, errs[i], "task %d failed: %v", i, errs[i])
 		require.Equal(t, fmt.Sprintf("Hi, User%d!", i), results[i])

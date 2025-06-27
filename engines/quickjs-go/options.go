@@ -18,6 +18,7 @@ type EngineOption struct {
 	Strip              int    `json:"strip"`              // Strip level for bytecode compilation
 }
 
+// Option is a function that applies a configuration to an Engine instance.
 type Option func(*Engine) error
 
 // WithGCThreshold sets the garbage collection threshold for the engine.
@@ -100,6 +101,7 @@ func WithStrip(strip int) Option {
 }
 
 // WithRpcScript sets the RPC script for the engine.
+// The script must not be empty.
 func WithRpcScript(script string) Option {
 	return func(e *Engine) error {
 		if script == "" {

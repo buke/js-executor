@@ -11,10 +11,10 @@ import (
 	"time"
 )
 
-// ThreadIdKey is the context key for specifying thread ID in requests
+// ThreadIdKey is the context key for specifying thread ID in requests.
 const ThreadIdKey = "__threadId"
 
-// pool manages a collection of JavaScript execution threads
+// pool manages a collection of JavaScript execution threads.
 type pool struct {
 	sync.RWMutex                       // Read-write mutex for thread map access
 	executor        *JsExecutor        // Reference to the parent executor
@@ -23,17 +23,17 @@ type pool struct {
 	roundRobinList  []uint32           // List of thread IDs for round-robin selection
 	roundRobinIndex uint32             // Current index for round-robin selection (atomic)
 	threadIdCounter uint32             // Counter for generating unique thread IDs (atomic)
-	stopCleanup     chan struct{}      // Chanoel to signal cleanup goroutine to stop
+	stopCleanup     chan struct{}      // Channel to signal cleanup goroutine to stop
 	replenishChan   chan struct{}      // Channel to signal thread replenishment
 }
 
-// threadCleanupInfo holds information about a thread to be cleaned up
+// threadCleanupInfo holds information about a thread to be cleaned up.
 type threadCleanupInfo struct {
 	id     uint32  // Thread ID
 	thread *thread // Thread instance
 }
 
-// newPool creates a new thread pool
+// newPool creates a new thread pool.
 func newPool(e *JsExecutor) *pool {
 	return &pool{
 		executor:        e,
@@ -47,7 +47,7 @@ func newPool(e *JsExecutor) *pool {
 	}
 }
 
-// start initializes the thread pool with minimum number of threads
+// start initializes the thread pool with the minimum number of threads.
 func (p *pool) start() error {
 	// Create minimum number of threads
 	for i := uint32(0); i < p.executor.options.minPoolSize; i++ {
@@ -64,7 +64,7 @@ func (p *pool) start() error {
 	return nil
 }
 
-// stop shuts down the thread pool and all threads
+// stop shuts down the thread pool and all threads.
 func (p *pool) stop() error {
 	close(p.stopCleanup)
 	close(p.replenishChan)
@@ -84,7 +84,7 @@ func (p *pool) stop() error {
 	return nil
 }
 
-// createThread creates and starts a new thread with atomic thread count control
+// createThread creates and starts a new thread with atomic thread count control.
 func (p *pool) createThread() (*thread, error) {
 	newCount := atomic.AddUint32(&p.threadCount, 1)
 	if newCount > p.executor.options.maxPoolSize {
@@ -114,7 +114,7 @@ func (p *pool) createThread() (*thread, error) {
 	return t, nil
 }
 
-// selectThread selects an appropriate thread for executing a request
+// selectThread selects an appropriate thread for executing a request.
 func (p *pool) selectThread(req *JsRequest) *thread {
 	p.RLock()
 	defer p.RUnlock()
@@ -155,9 +155,8 @@ func (p *pool) selectThread(req *JsRequest) *thread {
 	return p.threads[threadId]
 }
 
-// getOrCreateThread gets an existing thread or creates a new one if needed
+// getOrCreateThread gets an existing thread or creates a new one if needed.
 func (p *pool) getOrCreateThread(req *JsRequest) (*thread, error) {
-
 	// Try to get an existing thread first
 	if t := p.selectThread(req); t != nil {
 		queueThreshold := int(float64(p.executor.options.queueSize) * p.executor.options.createThreshold)
@@ -180,19 +179,19 @@ func (p *pool) getOrCreateThread(req *JsRequest) (*thread, error) {
 	}
 
 	// At max capacity, return an existing thread
-	return p.selectThread(req), nil
+	t := p.selectThread(req)
+	if t == nil {
+		return nil, fmt.Errorf("no available thread in pool")
+	}
+	return t, nil
 }
 
-// execute executes a task using an appropriate thread
+// execute executes a task using an appropriate thread.
 func (p *pool) execute(task *task) (*JsResponse, error) {
 	// Get a thread for execution
 	t, err := p.getOrCreateThread(task.request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get thread: %w", err)
-	}
-
-	if t == nil {
-		return nil, fmt.Errorf("no available thread to execute task")
 	}
 
 	// Enqueue the task
@@ -210,7 +209,7 @@ func (p *pool) execute(task *task) (*JsResponse, error) {
 	}
 }
 
-// reload reloads all threads with new scripts
+// reload reloads all threads with new scripts.
 func (p *pool) reload() error {
 	p.Lock()
 	defer p.Unlock()
@@ -224,7 +223,7 @@ func (p *pool) reload() error {
 	return nil
 }
 
-// retireThreads runs the background cleanup process
+// retireThreads runs the background cleanup process for idle or overused threads.
 func (p *pool) retireThreads() {
 	var ticker *time.Ticker
 	if p.executor.options.threadTTL > 0 {
@@ -246,7 +245,7 @@ func (p *pool) retireThreads() {
 	}
 }
 
-// removeThreadFromRoundRobin removes a thread ID from the round-robin list
+// removeThreadFromRoundRobin removes a thread ID from the round-robin list.
 func (p *pool) removeThreadFromRoundRobin(threadId uint32) {
 	for i, id := range p.roundRobinList {
 		if id == threadId {
@@ -256,7 +255,7 @@ func (p *pool) removeThreadFromRoundRobin(threadId uint32) {
 	}
 }
 
-// shouldRemoveThread determines if a thread should be removed based on TTL and execution count
+// shouldRemoveThread determines if a thread should be removed based on TTL and execution count.
 func (p *pool) shouldRemoveThread(t *thread, now time.Time) bool {
 	// Check TTL if configured
 	if p.executor.options.threadTTL > 0 {
@@ -275,7 +274,7 @@ func (p *pool) shouldRemoveThread(t *thread, now time.Time) bool {
 	return false
 }
 
-// performCleanup performs the actual cleanup of idle or overused threads
+// performCleanup performs the actual cleanup of idle or overused threads.
 func (p *pool) performCleanup() {
 	now := time.Now()
 
@@ -343,7 +342,7 @@ func (p *pool) performCleanup() {
 	}
 }
 
-// replenish checks if the pool needs more threads and creates them if necessary
+// replenish checks if the pool needs more threads and creates them if necessary.
 func (p *pool) replenish() {
 	for {
 		current := atomic.LoadUint32(&p.threadCount)
