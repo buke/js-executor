@@ -73,6 +73,17 @@ func (e *JsExecutor) Execute(request *JsRequest) (*JsResponse, error) {
 	if e.pool == nil {
 		return nil, fmt.Errorf("thread pool is not initialized")
 	}
+	start := time.Now()
+	defer func() {
+		if e.logger != nil {
+			elapsed := time.Since(start)
+			e.logger.Debug("JsExecutor.Execute",
+				"id", request.Id,
+				"service", request.Service,
+				"elapsed", elapsed,
+			)
+		}
+	}()
 	task := newTask(request)
 	return e.pool.execute(task)
 }

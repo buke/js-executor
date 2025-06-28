@@ -106,7 +106,7 @@ func (p *pool) createThread() (*thread, error) {
 	p.Unlock()
 
 	if p.executor.logger != nil {
-		p.executor.logger.Info("Thread created",
+		p.executor.logger.Debug("Thread created",
 			"thread", t.name,
 			"totalThreads", atomic.LoadUint32(&p.threadCount))
 	}
@@ -169,7 +169,7 @@ func (p *pool) getOrCreateThread(req *JsRequest) (*thread, error) {
 	currentThreadCount := atomic.LoadUint32(&p.threadCount)
 	if currentThreadCount < p.executor.options.maxPoolSize {
 		if p.executor.logger != nil {
-			p.executor.logger.Info("Creating new thread due to high load",
+			p.executor.logger.Debug("Creating new thread due to high load",
 				"currentThreads", currentThreadCount,
 				"maxPoolSize", p.executor.options.maxPoolSize)
 		}
@@ -339,7 +339,7 @@ func (p *pool) performCleanup() {
 				reason = "max executions reached"
 			}
 			if p.executor.logger != nil {
-				p.executor.logger.Info("Thread removed",
+				p.executor.logger.Debug("Thread removed",
 					"thread", th.name,
 					"reason", reason,
 					"executions", tc,

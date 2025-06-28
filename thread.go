@@ -148,7 +148,7 @@ func (t *thread) run() {
 			t.executeTask(task)
 			if t.checkAndRetireIfNeeded(&pendingActions) {
 				if t.executor.logger != nil {
-					t.executor.logger.Info("Thread reached max executions, retiring",
+					t.executor.logger.Debug("Thread reached max executions, retiring",
 						"thread", t.name,
 						"taskCount", t.getTaskCount(),
 					)
@@ -169,7 +169,7 @@ func (t *thread) executeAction(req *threadActionRequest) {
 	switch req.action {
 	case actionStop:
 		if t.executor.logger != nil {
-			t.executor.logger.Info("Thread stopping", "thread", t.name)
+			t.executor.logger.Debug("Thread stopping", "thread", t.name)
 		}
 		// Close the JavaScript engine
 		if t.jsEngine != nil {
@@ -186,7 +186,7 @@ func (t *thread) executeAction(req *threadActionRequest) {
 
 	case actionReload:
 		if t.executor.logger != nil {
-			t.executor.logger.Info("Thread starting reload", "thread", t.name)
+			t.executor.logger.Debug("Thread starting reload", "thread", t.name)
 		}
 		// Get initialization scripts safely
 		scripts := t.executor.getInitScripts()
@@ -202,14 +202,14 @@ func (t *thread) executeAction(req *threadActionRequest) {
 			}
 		} else {
 			if t.executor.logger != nil {
-				t.executor.logger.Info("Thread reload completed successfully",
+				t.executor.logger.Debug("Thread reload completed successfully",
 					"thread", t.name)
 			}
 		}
 
 	case actionRetire:
 		if t.executor.logger != nil {
-			t.executor.logger.Info("Thread retiring", "thread", t.name)
+			t.executor.logger.Debug("Thread retiring", "thread", t.name)
 		}
 		// Close the JavaScript engine
 		if t.jsEngine != nil {
