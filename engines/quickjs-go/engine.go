@@ -59,8 +59,8 @@ func (e *Engine) Execute(req *jsexecutor.JsRequest) (*jsexecutor.JsResponse, err
 
 	// Marshal the request to a JS value
 	jsReq, err := e.Ctx.Marshal(req)
+	defer jsReq.Free()
 	if err != nil {
-		defer jsReq.Free()
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
