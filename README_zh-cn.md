@@ -6,7 +6,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/buke/js-executor)](https://goreportcard.com/report/github.com/buke/js-executor)
 [![GoDoc](https://pkg.go.dev/badge/github.com/buke/js-executor?status.svg)](https://pkg.go.dev/github.com/buke/js-executor?tab=doc)
 
-Go 语言的 JavaScript 原生线程池执行器，100% 单元测试覆盖。
+Go 语言的 JavaScript 原生线程池执行器。
 
 ## 概述
 

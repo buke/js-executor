@@ -7,7 +7,7 @@ English | [简体中文](README_zh-cn.md)
 [![GoDoc](https://pkg.go.dev/badge/github.com/buke/js-executor?status.svg)](https://pkg.go.dev/github.com/buke/js-executor?tab=doc)
 
 
-JavaScript execution thread pool for Go with 100% test coverage.
+JavaScript execution thread pool for Go .
 
 ## Overview
 
