@@ -14,17 +14,16 @@ import (
 // ThreadIdKey is the context key for specifying thread ID in requests.
 const ThreadIdKey = "__threadId"
 
-// pool manages a collection of JavaScript execution threads.
+// pool manages a collection of JavaScript execution threads using lock-free algorithms.
 type pool struct {
-	sync.RWMutex                       // Read-write mutex for thread map access
-	executor        *JsExecutor        // Reference to the parent executor
-	threads         map[uint32]*thread // Map of thread ID to thread instance
-	threadCount     uint32             // Atomic: current number of threads in the pool
-	roundRobinList  []uint32           // List of thread IDs for round-robin selection
-	roundRobinIndex uint32             // Current index for round-robin selection (atomic)
-	threadIdCounter uint32             // Counter for generating unique thread IDs (atomic)
-	stopCleanup     chan struct{}      // Channel to signal cleanup goroutine to stop
-	replenishChan   chan struct{}      // Channel to signal thread replenishment
+	executor        *JsExecutor   // Reference to the parent executor
+	threads         sync.Map      // Lock-free map of thread ID to thread instance
+	threadIds       atomic.Value  // Stores *[]uint32 for round-robin selection (copy-on-write)
+	threadCount     uint32        // Atomic: current number of threads in the pool
+	roundRobinIndex uint32        // Current index for round-robin selection (atomic)
+	threadIdCounter uint32        // Counter for generating unique thread IDs (atomic)
+	stopCleanup     chan struct{} // Channel to signal cleanup goroutine to stop
+	replenishChan   chan struct{} // Channel to signal thread replenishment
 }
 
 // threadCleanupInfo holds information about a thread to be cleaned up.
@@ -33,18 +32,20 @@ type threadCleanupInfo struct {
 	thread *thread // Thread instance
 }
 
-// newPool creates a new thread pool.
+// newPool creates a new thread pool with lock-free data structures.
 func newPool(e *JsExecutor) *pool {
-	return &pool{
+	p := &pool{
 		executor:        e,
-		threads:         make(map[uint32]*thread),
-		roundRobinList:  make([]uint32, 0),
+		threadCount:     0,
 		roundRobinIndex: 0,
 		threadIdCounter: 0,
 		stopCleanup:     make(chan struct{}),
 		replenishChan:   make(chan struct{}, 1),
-		threadCount:     0,
 	}
+	// Initialize empty thread ID list with pointer
+	emptyIds := make([]uint32, 0)
+	p.threadIds.Store(&emptyIds)
+	return p
 }
 
 // start initializes the thread pool with the minimum number of threads.
@@ -69,19 +70,58 @@ func (p *pool) stop() error {
 	close(p.stopCleanup)
 	close(p.replenishChan)
 
-	p.Lock()
-	defer p.Unlock()
-
-	// Stop all threads
-	for _, t := range p.threads {
+	// Stop all threads by ranging over sync.Map
+	p.threads.Range(func(key, value interface{}) bool {
+		t := value.(*thread)
 		t.stop()
-	}
+		return true
+	})
 
 	// Clear the thread collections
-	p.threads = make(map[uint32]*thread)
-	p.roundRobinList = make([]uint32, 0)
+	p.threads = sync.Map{}
+	emptyIds := make([]uint32, 0)
+	p.threadIds.Store(&emptyIds)
 	atomic.StoreUint32(&p.threadCount, 0)
 	return nil
+}
+
+// addThreadToList adds a thread ID to the round-robin list using copy-on-write.
+func (p *pool) addThreadToList(threadId uint32) {
+	for {
+		oldIdsPtr := p.threadIds.Load().(*[]uint32)
+		oldIds := *oldIdsPtr
+		newIds := make([]uint32, len(oldIds)+1)
+		copy(newIds, oldIds)
+		newIds[len(oldIds)] = threadId
+
+		// Use CompareAndSwap with pointer to slice
+		if p.threadIds.CompareAndSwap(oldIdsPtr, &newIds) {
+			break
+		}
+		// If CAS fails, retry with the updated list
+	}
+}
+
+// removeThreadFromList removes a thread ID from the round-robin list using copy-on-write.
+func (p *pool) removeThreadFromList(threadId uint32) {
+	for {
+		oldIdsPtr := p.threadIds.Load().(*[]uint32)
+		oldIds := *oldIdsPtr
+		newIds := make([]uint32, 0, len(oldIds))
+
+		// Copy all IDs except the one to remove
+		for _, id := range oldIds {
+			if id != threadId {
+				newIds = append(newIds, id)
+			}
+		}
+
+		// Use CompareAndSwap with pointer to slice
+		if p.threadIds.CompareAndSwap(oldIdsPtr, &newIds) {
+			break
+		}
+		// If CAS fails, retry with the updated list
+	}
 }
 
 // createThread creates and starts a new thread with atomic thread count control.
@@ -93,17 +133,16 @@ func (p *pool) createThread() (*thread, error) {
 	}
 
 	threadId := atomic.AddUint32(&p.threadIdCounter, 1)
-
 	t := newThread(p.executor, "thread-"+strconv.FormatUint(uint64(threadId), 10), threadId)
 
 	// Start the thread goroutine
 	go t.run()
 
-	// Add thread to the pool (requires lock for structural changes)
-	p.Lock()
-	p.threads[threadId] = t
-	p.roundRobinList = append(p.roundRobinList, threadId)
-	p.Unlock()
+	// Add thread to sync.Map (lock-free)
+	p.threads.Store(threadId, t)
+
+	// Add thread ID to round-robin list (copy-on-write)
+	p.addThreadToList(threadId)
 
 	if p.executor.logger != nil {
 		p.executor.logger.Debug("Thread created",
@@ -114,45 +153,48 @@ func (p *pool) createThread() (*thread, error) {
 	return t, nil
 }
 
-// selectThread selects an appropriate thread for executing a request.
+// selectThread selects an appropriate thread for executing a request using lock-free round-robin.
 func (p *pool) selectThread(req *JsRequest) *thread {
-	p.RLock()
-	defer p.RUnlock()
-
 	// 1. Check if a specific thread is requested via context
 	if req.Context != nil {
 		if threadIdVal, exists := req.Context[ThreadIdKey]; exists {
 			if threadId, ok := threadIdVal.(uint32); ok {
-				if t, found := p.threads[threadId]; found {
-					return t
+				if t, found := p.threads.Load(threadId); found {
+					return t.(*thread)
 				}
 			}
 		}
 	}
 
-	// 2. Use round-robin selection with load balancing
-	listLen := len(p.roundRobinList)
+	// 2. Get current thread ID snapshot for round-robin selection
+	threadIds := *p.threadIds.Load().(*[]uint32)
+	listLen := len(threadIds)
 	if listLen == 0 {
 		return nil
 	}
 
-	// Try to find a thread that's not too busy
+	// 3. Try to find a thread that's not too busy (load balancing)
+	startIndex := atomic.AddUint32(&p.roundRobinIndex, 1) % uint32(listLen)
 	for i := 0; i < listLen; i++ {
-		index := atomic.AddUint32(&p.roundRobinIndex, 1) % uint32(listLen)
-		threadId := p.roundRobinList[index]
+		index := (startIndex + uint32(i)) % uint32(listLen)
+		threadId := threadIds[index]
 
-		if t, exists := p.threads[threadId]; exists {
+		if t, exists := p.threads.Load(threadId); exists {
+			thread := t.(*thread)
 			queueThreshold := int(float64(p.executor.options.queueSize) * p.executor.options.selectThreshold)
-			if len(t.taskQueue) < queueThreshold {
-				return t
+			if len(thread.taskQueue) < queueThreshold {
+				return thread
 			}
 		}
 	}
 
-	// 3. If all threads are busy, return the next thread in round-robin order
-	index := atomic.LoadUint32(&p.roundRobinIndex) % uint32(len(p.roundRobinList))
-	threadId := p.roundRobinList[index]
-	return p.threads[threadId]
+	// 4. If all threads are busy, return the next thread in round-robin order
+	threadId := threadIds[startIndex]
+	if t, exists := p.threads.Load(threadId); exists {
+		return t.(*thread)
+	}
+
+	return nil
 }
 
 // getOrCreateThread gets an existing thread or creates a new one if needed.
@@ -219,16 +261,19 @@ func (p *pool) execute(task *task) (*JsResponse, error) {
 
 // reload reloads all threads with new scripts.
 func (p *pool) reload() error {
-	p.Lock()
-	defer p.Unlock()
+	var reloadError error
 
-	for _, t := range p.threads {
+	// Range over sync.Map to reload all threads
+	p.threads.Range(func(key, value interface{}) bool {
+		t := value.(*thread)
 		if err := t.reload(); err != nil {
-			return fmt.Errorf("failed to reload thread %s: %w", t.name, err)
+			reloadError = fmt.Errorf("failed to reload thread %s: %w", t.name, err)
+			return false // Stop iteration on error
 		}
-	}
+		return true // Continue iteration
+	})
 
-	return nil
+	return reloadError
 }
 
 // retireThreads runs the background cleanup process for idle or overused threads.
@@ -253,16 +298,6 @@ func (p *pool) retireThreads() {
 	}
 }
 
-// removeThreadFromRoundRobin removes a thread ID from the round-robin list.
-func (p *pool) removeThreadFromRoundRobin(threadId uint32) {
-	for i, id := range p.roundRobinList {
-		if id == threadId {
-			p.roundRobinList = append(p.roundRobinList[:i], p.roundRobinList[i+1:]...)
-			break
-		}
-	}
-}
-
 // shouldRemoveThread determines if a thread should be removed based on TTL and execution count.
 func (p *pool) shouldRemoveThread(t *thread, now time.Time) bool {
 	// Check TTL if configured
@@ -282,20 +317,21 @@ func (p *pool) shouldRemoveThread(t *thread, now time.Time) bool {
 	return false
 }
 
-// performCleanup performs the actual cleanup of idle or overused threads.
+// performCleanup performs the actual cleanup of idle or overused threads using lock-free operations.
 func (p *pool) performCleanup() {
 	now := time.Now()
-
-	// Phase 1: Collect information about threads to remove (read lock)
-	p.RLock()
 	currentThreadCount := atomic.LoadUint32(&p.threadCount)
+
 	if currentThreadCount <= p.executor.options.minPoolSize {
-		p.RUnlock()
 		return
 	}
 
+	// Collect threads to remove by ranging over sync.Map
 	var threadsToRemove []threadCleanupInfo
-	for threadId, t := range p.threads {
+	p.threads.Range(func(key, value interface{}) bool {
+		threadId := key.(uint32)
+		t := value.(*thread)
+
 		if p.shouldRemoveThread(t, now) {
 			// Ensure we don't remove too many threads
 			if currentThreadCount-uint32(len(threadsToRemove)) > p.executor.options.minPoolSize {
@@ -305,29 +341,28 @@ func (p *pool) performCleanup() {
 				})
 			}
 		}
-	}
-	p.RUnlock()
+		return true // Continue iteration
+	})
 
 	if len(threadsToRemove) == 0 {
 		return
 	}
 
-	// Phase 2: Remove threads from pool (write lock, minimal time)
-	p.Lock()
+	// Remove threads from pool and update counters
 	actualRemovedCount := 0
 	for _, info := range threadsToRemove {
-		// Double-check thread still exists (avoid concurrent removal)
-		if _, exists := p.threads[info.id]; exists {
-			delete(p.threads, info.id)
-			p.removeThreadFromRoundRobin(info.id)
+		// Remove from sync.Map (this is atomic)
+		if _, loaded := p.threads.LoadAndDelete(info.id); loaded {
+			// Remove from round-robin list
+			p.removeThreadFromList(info.id)
+			atomic.AddUint32(&p.threadCount, ^uint32(0)) // -1
 			actualRemovedCount++
-			atomic.AddUint32(&p.threadCount, ^uint32(0)) // -1 for each removed thread
 		}
 	}
-	newThreadCount := atomic.LoadUint32(&p.threadCount)
-	p.Unlock()
 
-	// Phase 3: Stop threads asynchronously (no locks)
+	newThreadCount := atomic.LoadUint32(&p.threadCount)
+
+	// Stop threads asynchronously (no locks needed)
 	for _, info := range threadsToRemove {
 		taskCount := info.thread.getTaskCount()
 		lastUsed := info.thread.getLastUsed()

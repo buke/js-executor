@@ -6,7 +6,6 @@ package jsexecutor
 import (
 	"errors"
 	"log/slog"
-	"reflect"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -187,7 +186,8 @@ func TestPool_Execute_ThreadNil(t *testing.T) {
 	p := newPool(exec)
 	task := newTask(&JsRequest{Id: "fail"})
 	// Simulate no threads available by setting empty pool
-	p.threads = map[uint32]*thread{}
+	emptyIds := []uint32{}
+	p.threadIds.Store(&emptyIds) // Use pointer instead of direct slice
 	_, err := p.execute(task)
 	if err == nil {
 		t.Error("expected error when no available thread")
@@ -301,15 +301,49 @@ func TestPool_Stop(t *testing.T) {
 	}
 }
 
-// TestPool_RemoveThreadFromRoundRobin tests removing a thread from round robin list.
-func TestPool_RemoveThreadFromRoundRobin(t *testing.T) {
-	p := &pool{
-		roundRobinList: []uint32{1, 2, 3, 4},
+// TestPool_AddThreadToList tests adding a thread to the round-robin list.
+func TestPool_AddThreadToList(t *testing.T) {
+	exec := &JsExecutor{
+		options: &JsExecutorOption{},
 	}
-	p.removeThreadFromRoundRobin(3)
+	p := newPool(exec)
+
+	// Test adding to empty list
+	p.addThreadToList(1)
+	threadIds := *p.threadIds.Load().(*[]uint32) // Dereference pointer to get slice
+	if len(threadIds) != 1 || threadIds[0] != 1 {
+		t.Errorf("addThreadToList failed, got %v, want [1]", threadIds)
+	}
+
+	// Test adding to existing list
+	p.addThreadToList(2)
+	threadIds = *p.threadIds.Load().(*[]uint32) // Dereference pointer to get slice
+	if len(threadIds) != 2 || threadIds[1] != 2 {
+		t.Errorf("addThreadToList failed, got %v, want [1, 2]", threadIds)
+	}
+}
+
+// TestPool_RemoveThreadFromList tests removing a thread from the round-robin list.
+func TestPool_RemoveThreadFromList(t *testing.T) {
+	exec := &JsExecutor{
+		options: &JsExecutorOption{},
+	}
+	p := newPool(exec)
+	ids := []uint32{1, 2, 3, 4}
+	p.threadIds.Store(&ids) // Store pointer to slice
+
+	p.removeThreadFromList(3)
+	threadIds := *p.threadIds.Load().(*[]uint32) // Dereference pointer to get slice
 	expected := []uint32{1, 2, 4}
-	if !reflect.DeepEqual(p.roundRobinList, expected) {
-		t.Errorf("removeThreadFromRoundRobin failed, got %v, want %v", p.roundRobinList, expected)
+	if len(threadIds) != len(expected) {
+		t.Errorf("removeThreadFromList failed, got length %d, want %d", len(threadIds), len(expected))
+		return
+	}
+	for i, v := range expected {
+		if threadIds[i] != v {
+			t.Errorf("removeThreadFromList failed, got %v, want %v", threadIds, expected)
+			break
+		}
 	}
 }
 
@@ -330,12 +364,12 @@ func TestPool_ShouldRemoveThread(t *testing.T) {
 	}
 	// Should remove if exceeded maxExecutions
 	th.lastUsedNano = time.Now().UnixNano()
-	th.taskID = 2
+	atomic.StoreUint32(&th.taskID, 2)
 	if !p.shouldRemoveThread(th, time.Now()) {
 		t.Error("shouldRemoveThread should return true for overused thread")
 	}
 	// Should not remove if active and not overused
-	th.taskID = 0
+	atomic.StoreUint32(&th.taskID, 0)
 	th.lastUsedNano = time.Now().UnixNano()
 	if p.shouldRemoveThread(th, time.Now()) {
 		t.Error("shouldRemoveThread should return false for active thread")
@@ -354,14 +388,15 @@ func TestPool_PerformCleanup_MinPoolSize(t *testing.T) {
 	}
 	p := newPool(exec)
 	th := newThread(exec, "t1", 1)
-	p.threads = map[uint32]*thread{1: th}
-	p.roundRobinList = []uint32{1}
+	p.threads.Store(uint32(1), th)
+	ids := []uint32{1}
+	p.threadIds.Store(&ids) // Store pointer to slice
 	atomic.StoreUint32(&p.threadCount, 1)
 	th.lastUsedNano = time.Now().Add(-2 * time.Millisecond).UnixNano()
-	th.taskID = 2
+	atomic.StoreUint32(&th.taskID, 2)
 	p.performCleanup()
 	// Should not remove thread since threadCount <= minPoolSize
-	if _, ok := p.threads[1]; !ok {
+	if _, ok := p.threads.Load(uint32(1)); !ok {
 		t.Error("performCleanup should not remove thread when at minPoolSize")
 	}
 }
@@ -378,14 +413,15 @@ func TestPool_PerformCleanup_NoThreadsToRemove(t *testing.T) {
 	}
 	p := newPool(exec)
 	th := newThread(exec, "t1", 1)
-	p.threads = map[uint32]*thread{1: th}
-	p.roundRobinList = []uint32{1}
+	p.threads.Store(uint32(1), th)
+	ids := []uint32{1}
+	p.threadIds.Store(&ids) // Store pointer to slice
 	atomic.StoreUint32(&p.threadCount, 1)
 	th.lastUsedNano = time.Now().UnixNano()
-	th.taskID = 0
+	atomic.StoreUint32(&th.taskID, 0)
 	p.performCleanup()
 	// Should not remove thread since not idle or overused
-	if _, ok := p.threads[1]; !ok {
+	if _, ok := p.threads.Load(uint32(1)); !ok {
 		t.Error("performCleanup should not remove thread if not idle/overused")
 	}
 }
@@ -402,17 +438,19 @@ func TestPool_PerformCleanup(t *testing.T) {
 	}
 	p := newPool(exec)
 	th := newThread(exec, "t1", 1)
-	p.threads = map[uint32]*thread{1: th}
-	p.roundRobinList = []uint32{1}
+	p.threads.Store(uint32(1), th)
+	ids := []uint32{1}
+	p.threadIds.Store(&ids) // Store pointer to slice
 	atomic.StoreUint32(&p.threadCount, 1)
 	th.lastUsedNano = time.Now().Add(-2 * time.Millisecond).UnixNano()
-	th.taskID = 2
+	atomic.StoreUint32(&th.taskID, 2)
 	p.performCleanup()
-	if _, ok := p.threads[1]; ok {
+	if _, ok := p.threads.Load(uint32(1)); ok {
 		t.Error("performCleanup should remove thread")
 	}
-	if len(p.roundRobinList) != 0 {
-		t.Error("performCleanup should update roundRobinList")
+	threadIds := *p.threadIds.Load().(*[]uint32) // Dereference pointer to get slice
+	if len(threadIds) != 0 {
+		t.Error("performCleanup should update threadIds list")
 	}
 }
 
@@ -491,7 +529,6 @@ func TestPool_RetireThreads_Coverage(t *testing.T) {
 	default:
 		t.Log("replenishChan already full")
 	}
-
 }
 
 func TestPool_Start_CreateThreadError(t *testing.T) {
@@ -546,7 +583,7 @@ func TestPool_Execute_GetOrCreateThreadError(t *testing.T) {
 		},
 	}
 	p := newPool(exec)
-	p.threadCount = 1
+	atomic.StoreUint32(&p.threadCount, 1)
 	task := newTask(&JsRequest{Id: "fail"})
 	_, err := p.execute(task)
 	if err == nil || err.Error() == "" || err.Error() != "failed to get thread: no available thread in pool" {
@@ -600,8 +637,9 @@ func TestPool_PerformCleanup_MaxExecutionsReasonAndLogger(t *testing.T) {
 	th, _ := p.createThread()
 	atomic.StoreUint32(&th.taskID, 1)
 	th.lastUsedNano = time.Now().UnixNano()
-	p.threads = map[uint32]*thread{th.threadId: th}
-	p.roundRobinList = []uint32{th.threadId}
+	p.threads.Store(th.threadId, th)
+	ids := []uint32{th.threadId}
+	p.threadIds.Store(&ids) // Store pointer to slice
 	atomic.StoreUint32(&p.threadCount, 1)
 
 	p.performCleanup()
@@ -626,4 +664,114 @@ func TestPool_Replenish_LoggerError(t *testing.T) {
 	p := newPool(exec)
 	// replenish will try createThread, which fails and triggers logger.Error
 	p.replenish()
+}
+
+// TestPool_Execute_NoTimeout tests execute when executeTimeout is 0.
+func TestPool_Execute_NoTimeout(t *testing.T) {
+	exec := &JsExecutor{
+		engineFactory: mockEngineFactory(),
+		options: &JsExecutorOption{
+			minPoolSize:    1,
+			maxPoolSize:    2,
+			queueSize:      2,
+			executeTimeout: 0, // No timeout
+		},
+	}
+	p := newPool(exec)
+	if err := p.start(); err != nil {
+		t.Fatalf("pool start failed: %v", err)
+	}
+	defer p.stop()
+	req := &JsRequest{Id: "1"}
+	task := newTask(req)
+	resp, err := p.execute(task)
+	if err != nil {
+		t.Fatalf("pool execute failed: %v", err)
+	}
+	if resp == nil || resp.Id != "1" {
+		t.Errorf("unexpected execute result: %+v", resp)
+	}
+}
+
+// TestPool_SelectThread_EmptyThreadIds tests selectThread when threadIds is empty.
+func TestPool_SelectThread_EmptyThreadIds(t *testing.T) {
+	exec := &JsExecutor{
+		engineFactory: mockEngineFactory(),
+		options: &JsExecutorOption{
+			minPoolSize: 1,
+			maxPoolSize: 1,
+			queueSize:   1,
+		},
+	}
+	p := newPool(exec)
+	emptyIds := []uint32{}
+	p.threadIds.Store(&emptyIds) // Store pointer to slice
+	req := &JsRequest{}
+	selected := p.selectThread(req)
+	if selected != nil {
+		t.Error("selectThread should return nil when threadIds is empty")
+	}
+}
+
+// TestPool_SelectThread_ThreadNotFound tests selectThread when thread is not found in sync.Map.
+func TestPool_SelectThread_ThreadNotFound(t *testing.T) {
+	exec := &JsExecutor{
+		engineFactory: mockEngineFactory(),
+		options: &JsExecutorOption{
+			minPoolSize:     1,
+			maxPoolSize:     1,
+			queueSize:       1,
+			selectThreshold: 0.5,
+		},
+	}
+	p := newPool(exec)
+	ids := []uint32{999}    // Non-existent thread ID
+	p.threadIds.Store(&ids) // Store pointer to slice
+	req := &JsRequest{}
+	selected := p.selectThread(req)
+	if selected != nil {
+		t.Error("selectThread should return nil when thread is not found")
+	}
+}
+
+// TestPool_AddRemoveThreadToList_Concurrent tests concurrent add/remove operations.
+func TestPool_AddRemoveThreadToList_Concurrent(t *testing.T) {
+	exec := &JsExecutor{
+		options: &JsExecutorOption{},
+	}
+	p := newPool(exec)
+
+	var wg sync.WaitGroup
+
+	// Concurrent adds
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(id uint32) {
+			defer wg.Done()
+			p.addThreadToList(id)
+		}(uint32(i))
+	}
+
+	wg.Wait()
+
+	threadIds := *p.threadIds.Load().(*[]uint32) // Dereference pointer to get slice
+	if len(threadIds) != 10 {
+		t.Errorf("expected 10 thread IDs, got %d", len(threadIds))
+	}
+
+	// Concurrent removes
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func(id uint32) {
+			defer wg.Done()
+			p.removeThreadFromList(id)
+		}(uint32(i))
+	}
+
+	wg.Wait()
+
+	threadIds = *p.threadIds.Load().(*[]uint32) // Dereference pointer to get slice
+	if len(threadIds) != 5 {
+		t.Errorf("expected 5 thread IDs after removal, got %d", len(threadIds))
+	}
 }
