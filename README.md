@@ -7,7 +7,7 @@ English | [简体中文](README_zh-cn.md)
 [![GoDoc](https://pkg.go.dev/badge/github.com/buke/js-executor?status.svg)](https://pkg.go.dev/github.com/buke/js-executor?tab=doc)
 
 
-A pluggable JavaScript execution pool for Go, with built-in support for QuickJS and Goja engines.
+JavaScript execution thread pool for Go, with built-in support for QuickJS and Goja engines.
 
 ## Overview
 
@@ -21,6 +21,27 @@ It supports pluggable engine backends (such as QuickJS and Goja), initialization
 |----------|------------------------------------------------------------------|-------------------------------------|
 | QuickJS  | [github.com/buke/quickjs-go](https://github.com/buke/quickjs-go) | CGo-based, high performance.        |
 | Goja     | [github.com/dop251/goja](https://github.com/dop251/goja)         | Pure Go, no CGo dependency.         |
+
+### Benchmark
+```shell
+$ go test -run=^$ -bench=. -benchmem
+
+goos: darwin
+goarch: arm64
+pkg: github.com/buke/js-executor
+cpu: Apple M4
+BenchmarkExecutor_QuickJS-10               26292             44961 ns/op            1092 B/op         46 allocs/op
+BenchmarkExecutor_Goja-10                  12428             99048 ns/op           50058 B/op        720 allocs/op
+PASS
+ok      github.com/buke/js-executor     4.055s
+```
+
+**Analysis:**
+
+*   **Performance (`ns/op`)**: QuickJS is approximately **2.2x faster** in this high-concurrency, CPU-bound test(Fibonacci). Its low-level C implementation and minimal pressure on the Go garbage collector (GC) allow it to excel under heavy load.
+*   **Memory (`B/op`, `allocs/op`)**: The memory statistics highlight a crucial difference.
+    *   **Goja**: As a pure Go engine, its memory usage is fully tracked by Go's tools. The higher numbers reflect the total cost of JS execution within the Go runtime, which can lead to increased GC pressure.
+    *   **QuickJS**: The reported numbers **only show the Go-side allocation overhead**. The memory used by the C-based QuickJS engine itself is **not measured** by Go's benchmark tool. This results in extremely low GC pressure on the Go application, which is a key reason for its high performance.
 
 ## Features
 

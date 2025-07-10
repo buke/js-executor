@@ -21,6 +21,28 @@ Go 语言 JavaScript 执行池，内置支持 QuickJS 和 Goja 引擎。
 | QuickJS | [github.com/buke/quickjs-go](https://github.com/buke/quickjs-go) | 基于 CGo，性能高。           |
 | Goja    | [github.com/dop251/goja](https://github.com/dop251/goja)         | 纯 Go 实现，无 CGo 依赖。    |
 
+### 基准测试
+```shell
+$ go test -run=^$ -bench=. -benchmem
+
+goos: darwin
+goarch: arm64
+pkg: github.com/buke/js-executor
+cpu: Apple M4
+BenchmarkExecutor_QuickJS-10               26292             44961 ns/op            1092 B/op         46 allocs/op
+BenchmarkExecutor_Goja-10                  12428             99048 ns/op           50058 B/op        720 allocs/op
+PASS
+ok      github.com/buke/js-executor     4.055s
+```
+
+**结果分析：**
+
+*   **性能 (`ns/op`)**: 在这个高并发、CPU 密集型的测试(斐波那契)中，QuickJS 的速度大约是 Goja 的 **2.2 倍**。其底层的 C 语言实现以及对 Go 垃圾回收器（GC）的极小压力使其在高负载下表现出色。
+*   **内存 (`B/op`, `allocs/op`)**: 内存统计数据揭示了一个关键差异。
+    *   **Goja**: 作为一个纯 Go 引擎，其内存使用完全由 Go 的工具追踪。较高的数值反映了在 Go 运行时中执行 JS 的全部成本，这可能会导致更大的 GC 压力。
+    *   **QuickJS**: 报告的数字**仅显示了 Go 语言侧的开销**。基于 C 的 QuickJS 引擎本身使用的内存**并不能**被 Go 的基准测试工具测量到。这使得 Go 应用的 GC 压力极低，也是其高性能的关键原因之一。
+
+
 ## 功能特性
 
 - **线程池模型**：基于原生线程池高效并行处理多任务 JavaScript 执行。
