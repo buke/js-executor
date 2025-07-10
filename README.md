@@ -7,32 +7,33 @@ English | [简体中文](README_zh-cn.md)
 [![GoDoc](https://pkg.go.dev/badge/github.com/buke/js-executor?status.svg)](https://pkg.go.dev/github.com/buke/js-executor?tab=doc)
 
 
-JavaScript execution thread pool for Go .
+A pluggable JavaScript execution pool for Go, with built-in support for QuickJS and Goja engines.
 
 ## Overview
 
 **js-executor** is a high-performance, flexible JavaScript execution pool for Go.  
 It provides a thread pool model for executing JavaScript code in parallel, running each engine instance in a native OS thread.  
-It supports pluggable engine backends (such as QuickJS), initialization scripts, context passing, and robust resource management.
+It supports pluggable engine backends (such as QuickJS and Goja), initialization scripts, context passing, and robust resource management.
 
 ## Supported Engines
 
-| Engine   | Repository                                                       |  
-|----------|------------------------------------------------------------------|
-| QuickJS  | [github.com/buke/quickjs-go](https://github.com/buke/quickjs-go) |
+| Engine   | Repository                                                       | Notes                               |
+|----------|------------------------------------------------------------------|-------------------------------------|
+| QuickJS  | [github.com/buke/quickjs-go](https://github.com/buke/quickjs-go) | CGo-based, high performance.        |
+| Goja     | [github.com/dop251/goja](https://github.com/dop251/goja)         | Pure Go, no CGo dependency.         |
 
 ## Features
 
 - **Thread Pool Model**: Efficiently handles multiple JavaScript tasks in parallel using native threads.
-- **Pluggable Engine Support**: Easily integrates with different JavaScript engines (e.g., QuickJS).
+- **Pluggable Engine Support**: Easily integrates with different JavaScript engines (e.g., QuickJS, Goja).
 - **Initialization Scripts**: Supports loading and reloading of initialization scripts for all threads.
 - **Context Passing**: Allows passing custom context data with each request and response.
 - **Resource Management**: Automatic thread lifecycle management, including idle timeout and max execution limits.
 - **Timeout and Limits**: Configurable execution timeout, memory limit, stack size, and more.
-- **Cross-Platform**: Works on Linux, macOS, and Windows.
-- **100% Test Coverage**: All core modules and engine options are fully tested.
 
 ## Usage Example
+
+The following example demonstrates how to use the **QuickJS** engine.
 
 ```go
 import (
