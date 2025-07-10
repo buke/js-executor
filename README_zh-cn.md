@@ -6,30 +6,29 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/buke/js-executor)](https://goreportcard.com/report/github.com/buke/js-executor)
 [![GoDoc](https://pkg.go.dev/badge/github.com/buke/js-executor?status.svg)](https://pkg.go.dev/github.com/buke/js-executor?tab=doc)
 
-Go 语言的 JavaScript 原生线程池执行器。
+Go 语言 JavaScript 执行池，内置支持 QuickJS 和 Goja 引擎。
 
 ## 概述
 
 **js-executor** 是一个高性能、灵活的 Go 语言 JavaScript 执行池。  
 它通过原生操作系统线程池模型并行执行 JavaScript 代码，每个引擎实例运行在独立的原生线程中。  
-支持可插拔的引擎后端（如 QuickJS）、初始化脚本、上下文传递和强大的资源管理。
+支持可插拔的引擎后端（如 QuickJS 和 Goja）、初始化脚本、上下文传递和强大的资源管理。
 
 ## 支持的引擎
 
-| 引擎    | 仓库地址                                                    |
-|---------|-------------------------------------------------------------|
-| QuickJS | [github.com/buke/quickjs-go](https://github.com/buke/quickjs-go) |
+| 引擎    | 仓库地址                                                       | 说明                         |
+|---------|------------------------------------------------------------------|------------------------------|
+| QuickJS | [github.com/buke/quickjs-go](https://github.com/buke/quickjs-go) | 基于 CGo，性能高。           |
+| Goja    | [github.com/dop251/goja](https://github.com/dop251/goja)         | 纯 Go 实现，无 CGo 依赖。    |
 
 ## 功能特性
 
 - **线程池模型**：基于原生线程池高效并行处理多任务 JavaScript 执行。
-- **可插拔引擎**：可灵活集成不同的 JavaScript 引擎（如 QuickJS）。
+- **可插拔引擎**：可灵活集成不同的 JavaScript 引擎（如 QuickJS、Goja）。
 - **初始化脚本**：支持为所有线程加载和热重载初始化脚本。
 - **上下文传递**：每次请求和响应都可传递自定义上下文数据。
 - **资源管理**：自动线程生命周期管理，包括空闲超时和最大执行次数。
 - **超时与限制**：可配置执行超时、内存限制、栈大小等参数。
-- **跨平台**：支持 Linux、macOS 和 Windows。
-- **100% 单元测试覆盖**：所有核心模块和引擎选项均有完整测试。
 
 ## 使用示例
 
