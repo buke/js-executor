@@ -36,7 +36,7 @@ jobs:
     - name: Test with coverage (Windows)
       if: runner.os == 'Windows'
       run: |
-        go test -v -race -coverprofile=coverage.out ./... -coverpkg=./... -tags=windows_skip_v8go -run='^(?:(?!/v8go/).)*$'
+        go test -v -race -coverprofile=coverage.out  ./...
       shell: cmd
 
         
