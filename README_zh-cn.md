@@ -10,9 +10,7 @@ Go 语言 JavaScript 执行池，内置支持 QuickJS / Goja / V8 引擎。
 
 ## 概述
 
-**js-executor** 是一个高性能、灵活的 Go 语言 JavaScript 执行池。  
-它通过原生操作系统线程池模型并行执行 JavaScript 代码，每个引擎实例运行在独立的原生线程中。  
-支持可插拔的引擎后端（如 QuickJS、Goja、V8）、初始化脚本、上下文传递和强大的资源管理。
+**js-executor** 通过原生操作系统线程池模型并行执行 JavaScript 代码，每个引擎实例运行在独立的原生线程中，支持可插拔的引擎后端（如 QuickJS、Goja、V8）、初始化脚本、上下文传递和强大的资源管理。
 
 ## 功能特性
 
@@ -25,6 +23,10 @@ Go 语言 JavaScript 执行池，内置支持 QuickJS / Goja / V8 引擎。
 - **超时与限制**：可配置执行超时、内存限制、栈大小等参数。
 
 ## 使用示例
+
+以下示例分别展示如何使用 **QuickJS**、**Goja** 和 **V8Go** 引擎。
+
+### QuickJS 示例
 
 ```go
 import (
@@ -66,6 +68,100 @@ func main() {
         panic(err)
     }
     fmt.Println(resp.Result) // 输出: Hello, 世界!
+}
+```
+
+### Goja 示例
+
+```go
+import (
+    "fmt"
+    jsexecutor "github.com/buke/js-executor"
+    gojaengine "github.com/buke/js-executor/engines/goja"
+)
+
+func main() {
+    // 准备初始化脚本
+    initScript := &jsexecutor.InitScript{
+        FileName: "hello.js",
+        Content:  `function hello(name) { return "Hello, " + name + "!"; }`,
+    }
+
+    // 创建带 Goja 引擎的执行器
+    executor, err := jsexecutor.NewExecutor(
+        jsexecutor.WithJsEngine(gojaengine.NewFactory()),
+        jsexecutor.WithInitScripts(initScript),
+    )
+    if err != nil {
+        panic(err)
+    }
+    defer executor.Stop()
+
+    // 启动执行器
+    if err := executor.Start(); err != nil {
+        panic(err)
+    }
+
+    // 执行 JS 函数
+    req := &jsexecutor.JsRequest{
+        Id:      "goja-1",
+        Service: "hello",
+        Args:    []interface{}{"Goja"},
+    }
+    resp, err := executor.Execute(req)
+    if err != nil {
+        panic(err)
+    }
+    fmt.Println(resp.Result) // 输出: Hello, Goja!
+}
+```
+
+### V8Go 示例
+
+> **注意：V8Go 不支持 Windows。**
+
+```go
+//go:build !windows
+
+import (
+    "fmt"
+    jsexecutor "github.com/buke/js-executor"
+    v8engine "github.com/buke/js-executor/engines/v8go"
+)
+
+func main() {
+    // 准备初始化脚本
+    initScript := &jsexecutor.InitScript{
+        FileName: "hello.js",
+        Content:  `function hello(name) { return "Hello, " + name + "!"; }`,
+    }
+
+    // 创建带 V8Go 引擎的执行器
+    executor, err := jsexecutor.NewExecutor(
+        jsexecutor.WithJsEngine(v8engine.NewFactory()),
+        jsexecutor.WithInitScripts(initScript),
+    )
+    if err != nil {
+        panic(err)
+    }
+    defer executor.Stop()
+
+    // 启动执行器
+    if err := executor.Start(); err != nil {
+        panic(err)
+    }
+
+    // 执行 JS 函数
+    req := &jsexecutor.JsRequest{
+        Id:      "v8go-1",
+        Service: "hello",
+        Args:    []interface{}{"V8Go"},
+    }
+    resp, err := executor.Execute(req)
+    if err != nil {
+        panic(err)
+    }
+    fmt.Println(resp.Result) // 输出: Hello, V8Go!
 }
 ```
 

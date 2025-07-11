@@ -10,9 +10,7 @@ JavaScript execution thread pool for Go, with built-in support for QuickJS / Goj
 
 ## Overview
 
-**js-executor** is a high-performance, flexible JavaScript execution pool for Go.  
-It provides a thread pool model for executing JavaScript code in parallel, running each engine instance in a native OS thread.  
-It supports pluggable engine backends (such as QuickJS, Goja, and V8), initialization scripts, context passing, and robust resource management.
+**js-executor**  provides a thread pool model for executing JavaScript code in parallel, running each engine instance in a native OS thread, and supports pluggable engine backends (such as QuickJS, Goja, and V8), initialization scripts, context passing, and robust resource management.
 
 ## Features
 
@@ -26,7 +24,9 @@ It supports pluggable engine backends (such as QuickJS, Goja, and V8), initializ
 
 ## Usage Example
 
-The following example demonstrates how to use the **QuickJS** engine.
+The following example demonstrates how to use the **QuickJS**, **Goja**, and **V8Go** engines.
+
+### QuickJS Example
 
 ```go
 import (
@@ -68,6 +68,100 @@ func main() {
         panic(err)
     }
     fmt.Println(resp.Result) // Output: Hello, World!
+}
+```
+
+### Goja Example
+
+```go
+import (
+    "fmt"
+    jsexecutor "github.com/buke/js-executor"
+    gojaengine "github.com/buke/js-executor/engines/goja"
+)
+
+func main() {
+    // Prepare an initialization script
+    initScript := &jsexecutor.InitScript{
+        FileName: "hello.js",
+        Content:  `function hello(name) { return "Hello, " + name + "!"; }`,
+    }
+
+    // Create a new executor with Goja engine
+    executor, err := jsexecutor.NewExecutor(
+        jsexecutor.WithJsEngine(gojaengine.NewFactory()),
+        jsexecutor.WithInitScripts(initScript),
+    )
+    if err != nil {
+        panic(err)
+    }
+    defer executor.Stop()
+
+    // Start the executor
+    if err := executor.Start(); err != nil {
+        panic(err)
+    }
+
+    // Execute a JS function
+    req := &jsexecutor.JsRequest{
+        Id:      "goja-1",
+        Service: "hello",
+        Args:    []interface{}{"Goja"},
+    }
+    resp, err := executor.Execute(req)
+    if err != nil {
+        panic(err)
+    }
+    fmt.Println(resp.Result) // Output: Hello, Goja!
+}
+```
+
+### V8Go Example
+
+> **Note:** V8Go is not supported on Windows.
+
+```go
+//go:build !windows
+
+import (
+    "fmt"
+    jsexecutor "github.com/buke/js-executor"
+    v8engine "github.com/buke/js-executor/engines/v8go"
+)
+
+func main() {
+    // Prepare an initialization script
+    initScript := &jsexecutor.InitScript{
+        FileName: "hello.js",
+        Content:  `function hello(name) { return "Hello, " + name + "!"; }`,
+    }
+
+    // Create a new executor with V8Go engine
+    executor, err := jsexecutor.NewExecutor(
+        jsexecutor.WithJsEngine(v8engine.NewFactory()),
+        jsexecutor.WithInitScripts(initScript),
+    )
+    if err != nil {
+        panic(err)
+    }
+    defer executor.Stop()
+
+    // Start the executor
+    if err := executor.Start(); err != nil {
+        panic(err)
+    }
+
+    // Execute a JS function
+    req := &jsexecutor.JsRequest{
+        Id:      "v8go-1",
+        Service: "hello",
+        Args:    []interface{}{"V8Go"},
+    }
+    resp, err := executor.Execute(req)
+    if err != nil {
+        panic(err)
+    }
+    fmt.Println(resp.Result) // Output: Hello, V8Go!
 }
 ```
 
