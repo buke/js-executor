@@ -6,6 +6,7 @@ import (
 	jsexecutor "github.com/buke/js-executor"
 	gojaengine "github.com/buke/js-executor/engines/goja"
 	quickjsengine "github.com/buke/js-executor/engines/quickjs-go"
+	v8engine "github.com/buke/js-executor/engines/v8go"
 )
 
 // A simple CPU-intensive script for benchmarking.
@@ -60,12 +61,17 @@ func runExecutorBenchmark(b *testing.B, factory jsexecutor.JsEngineFactory) {
 	})
 }
 
+// BenchmarkExecutor_Goja benchmarks the executor with the Goja engine.
+func BenchmarkExecutor_Goja(b *testing.B) {
+	runExecutorBenchmark(b, gojaengine.NewFactory())
+}
+
 // BenchmarkExecutor_QuickJS benchmarks the executor with the QuickJS engine.
 func BenchmarkExecutor_QuickJS(b *testing.B) {
 	runExecutorBenchmark(b, quickjsengine.NewFactory())
 }
 
-// BenchmarkExecutor_Goja benchmarks the executor with the Goja engine.
-func BenchmarkExecutor_Goja(b *testing.B) {
-	runExecutorBenchmark(b, gojaengine.NewFactory())
+// BenchmarkExecutor_V8Go benchmarks the executor with the V8 engine.
+func BenchmarkExecutor_V8Go(b *testing.B) {
+	runExecutorBenchmark(b, v8engine.NewFactory())
 }

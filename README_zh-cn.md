@@ -6,18 +6,19 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/buke/js-executor)](https://goreportcard.com/report/github.com/buke/js-executor)
 [![GoDoc](https://pkg.go.dev/badge/github.com/buke/js-executor?status.svg)](https://pkg.go.dev/github.com/buke/js-executor?tab=doc)
 
-Go 语言 JavaScript 执行池，内置支持 QuickJS 和 Goja 引擎。
+Go 语言 JavaScript 执行池，内置支持 QuickJS / Goja / V8 引擎。
 
 ## 概述
 
 **js-executor** 是一个高性能、灵活的 Go 语言 JavaScript 执行池。  
 它通过原生操作系统线程池模型并行执行 JavaScript 代码，每个引擎实例运行在独立的原生线程中。  
-支持可插拔的引擎后端（如 QuickJS 和 Goja）、初始化脚本、上下文传递和强大的资源管理。
+支持可插拔的引擎后端（如 QuickJS、Goja、V8）、初始化脚本、上下文传递和强大的资源管理。
 
 ## 功能特性
 
 - **线程池模型**：基于原生线程池高效并行处理多任务 JavaScript 执行。
-- **可插拔引擎**：可灵活集成不同的 JavaScript 引擎（如 QuickJS、Goja）。
+- **内置支持 QuickJS / Goja / V8 引擎**。
+- **可插拔引擎**：可灵活集成不同的 JavaScript 引擎（如 QuickJS、Goja、V8）。
 - **初始化脚本**：支持为所有线程加载和热重载初始化脚本。
 - **上下文传递**：每次请求和响应都可传递自定义上下文数据。
 - **资源管理**：自动线程生命周期管理，包括空闲超时和最大执行次数。
@@ -87,10 +88,11 @@ func main() {
 
 ## 支持的引擎
 
-| 引擎    | 仓库地址                                                       | 说明                         |
-|---------|------------------------------------------------------------------|------------------------------|
-| QuickJS | [github.com/buke/quickjs-go](https://github.com/buke/quickjs-go) | 基于 CGo，性能高。           |
-| Goja    | [github.com/dop251/goja](https://github.com/dop251/goja)         | 纯 Go 实现，无 CGo 依赖。    |
+| 引擎    | 仓库地址                                                           | 说明                                         |
+|---------|--------------------------------------------------------------------|----------------------------------------------|
+| QuickJS | [github.com/buke/quickjs-go](https://github.com/buke/quickjs-go)   | 基于 CGo，性能高。                           |
+| Goja    | [github.com/dop251/goja](https://github.com/dop251/goja)           | 纯 Go 实现，无 CGo 依赖。                    |
+| V8Go    | [github.com/tommie/v8go](https://github.com/tommie/v8go)           | 基于 CGo，V8 引擎，最快。不支持 Windows。    |
 
 ### 基准测试
 ```shell
@@ -100,19 +102,25 @@ goos: darwin
 goarch: arm64
 pkg: github.com/buke/js-executor
 cpu: Apple M4
-BenchmarkExecutor_QuickJS-10               26292             44961 ns/op            1092 B/op         46 allocs/op
-BenchmarkExecutor_Goja-10                  12428             99048 ns/op           50058 B/op        720 allocs/op
+BenchmarkExecutor_Goja-10                  13106             92237 ns/op           52404 B/op        761 allocs/op
+BenchmarkExecutor_QuickJS-10               26239             45663 ns/op            1092 B/op         46 allocs/op
+BenchmarkExecutor_V8Go-10                 134680              8719 ns/op             986 B/op         31 allocs/op
 PASS
-ok      github.com/buke/js-executor     4.055s
+ok      github.com/buke/js-executor     5.725s
 ```
 
 **结果分析：**
 
-*   **性能 (`ns/op`)**: 在这个高并发、CPU 密集型的测试(斐波那契)中，QuickJS 的速度大约是 Goja 的 **2.2 倍**。其底层的 C 语言实现以及对 Go 垃圾回收器（GC）的极小压力使其在高负载下表现出色。
-*   **内存 (`B/op`, `allocs/op`)**: 内存统计数据揭示了一个关键差异。
-    *   **Goja**: 作为一个纯 Go 引擎，其内存使用完全由 Go 的工具追踪。较高的数值反映了在 Go 运行时中执行 JS 的全部成本，这可能会导致更大的 GC 压力。
-    *   **QuickJS**: 报告的数字**仅显示了 Go 语言侧的开销**。基于 C 的 QuickJS 引擎本身使用的内存**并不能**被 Go 的基准测试工具测量到。这使得 Go 应用的 GC 压力极低，也是其高性能的关键原因之一。
-
+*   **性能 (`ns/op`)**:  
+    - **Goja** 作为基准（**1x**）。
+    - **QuickJS** 约为 Goja 的 **2 倍**速度。
+    - **V8Go** 约为 Goja 的 **10 倍**速度，约为 QuickJS 的 **5 倍**速度（高并发、CPU 密集型场景）。
+*   **内存 (`B/op`, `allocs/op`)**:  
+    - **V8Go** 和 **QuickJS** 的 Go 侧内存分配和分配次数都非常低。
+    - **Goja**（纯 Go）内存分配和分配次数明显更高，因为所有 JS 内存都由 Go 运行时和 GC 管理。
+    - 注意：CGo 引擎（V8Go、QuickJS）Go 基准测试只统计 Go 侧分配，原生引擎内存未统计。
+*   **平台**:  
+    - **V8Go** 不支持 Windows。
 
 ## 许可
 

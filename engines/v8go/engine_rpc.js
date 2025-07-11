@@ -1,4 +1,6 @@
 async rpcRequest => {
+  rpcRequest = JSON.parse(rpcRequest);
+
   if (rpcRequest.args == undefined) {
     rpcRequest.args = [];
   }

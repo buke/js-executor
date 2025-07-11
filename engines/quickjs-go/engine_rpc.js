@@ -13,6 +13,11 @@ async rpcRequest => {
   let cls = (0, eval)(rpcRequest.service.split('.').slice(0, -1).join('.'));
   let methodName = rpcRequest.service.split('.').slice(-1).join('');
 
+  // If the target property is undefined, the service path is invalid.
+  if (cls[methodName] === undefined) {
+    throw new ReferenceError(`${rpcRequest.service} is not defined`);
+  }
+
   if (typeof cls[methodName] === 'function') {
     // static method
     rpcResponse.result = cls[methodName](...rpcRequest.args);
