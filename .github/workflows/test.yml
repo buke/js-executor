@@ -3,7 +3,8 @@ name: Test
 on:
   push:
     branches: [ "main" ]
-  pull_request:
+  pull_request_target:
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
@@ -16,7 +17,10 @@ jobs:
             go: ['stable']
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout PR code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
 
     - name: Set up Go
       uses: actions/setup-go@v5
@@ -50,4 +54,3 @@ jobs:
         name: codecov-${{ matrix.os }}-go${{ matrix.go }}
         fail_ci_if_error: true
         verbose: true
-
