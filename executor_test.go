@@ -319,12 +319,12 @@ func TestJsExecutor_SetInitScripts_EmptyScripts(t *testing.T) {
 	}
 	// Set non-empty first
 	scripts := []*InitScript{{FileName: "a.js", Content: "var a = 1;"}}
-	executor.setInitScripts(scripts)
+	executor.SetInitScripts(scripts)
 	if got := executor.getInitScripts(); !reflect.DeepEqual(got, scripts) {
 		t.Errorf("Expected scripts to be set")
 	}
 	// Now set empty
-	executor.setInitScripts([]*InitScript{})
+	executor.SetInitScripts([]*InitScript{})
 	if got := executor.getInitScripts(); got != nil {
 		t.Errorf("Expected getInitScripts to return nil when set with empty slice, got: %+v", got)
 	}

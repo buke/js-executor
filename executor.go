@@ -46,7 +46,7 @@ func (e *JsExecutor) getInitScripts() []*InitScript {
 }
 
 // setInitScripts atomically sets new initialization scripts.
-func (e *JsExecutor) setInitScripts(scripts []*InitScript) {
+func (e *JsExecutor) SetInitScripts(scripts []*InitScript) {
 	if len(scripts) == 0 {
 		atomic.StorePointer(&e.initScriptsPtr, nil)
 		return
@@ -103,7 +103,7 @@ func (e *JsExecutor) Reload(scripts ...*InitScript) error {
 	}
 
 	if len(scripts) > 0 {
-		e.setInitScripts(scripts) // Use safe setter method.
+		e.SetInitScripts(scripts) // Use safe setter method.
 	}
 
 	return e.pool.reload()
@@ -160,7 +160,7 @@ func WithLogger(logger *slog.Logger) func(*JsExecutor) {
 func WithInitScripts(scripts ...*InitScript) func(*JsExecutor) {
 	return func(executor *JsExecutor) {
 		if len(scripts) > 0 {
-			executor.setInitScripts(scripts) // Use safe setter method.
+			executor.SetInitScripts(scripts) // Use safe setter method.
 		}
 	}
 }
