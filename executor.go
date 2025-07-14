@@ -37,7 +37,7 @@ type JsExecutor struct {
 }
 
 // getInitScripts returns the current initialization scripts (no copy, read-only).
-func (e *JsExecutor) getInitScripts() []*InitScript {
+func (e *JsExecutor) GetInitScripts() []*InitScript {
 	ptr := atomic.LoadPointer(&e.initScriptsPtr)
 	if ptr == nil {
 		return nil

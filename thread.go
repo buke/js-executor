@@ -87,7 +87,7 @@ func (t *thread) initEngine() error {
 	t.jsEngine = jsEngine
 
 	// Get initialization scripts safely
-	scripts := t.executor.getInitScripts()
+	scripts := t.executor.GetInitScripts()
 
 	// Initialize the engine with scripts
 	if err := t.jsEngine.Init(scripts); err != nil {
@@ -189,7 +189,7 @@ func (t *thread) executeAction(req *threadActionRequest) {
 			t.executor.logger.Debug("Thread starting reload", "thread", t.name)
 		}
 		// Get initialization scripts safely
-		scripts := t.executor.getInitScripts()
+		scripts := t.executor.GetInitScripts()
 		err := t.jsEngine.Reload(scripts)
 		req.done <- err
 

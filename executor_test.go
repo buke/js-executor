@@ -148,7 +148,7 @@ func TestJsExecutor_Reload(t *testing.T) {
 	if err := executor.Reload(scripts...); err != nil {
 		t.Fatalf("Reload failed: %v", err)
 	}
-	got := executor.getInitScripts()
+	got := executor.GetInitScripts()
 	if !reflect.DeepEqual(got, scripts) {
 		t.Errorf("Reload did not set scripts correctly, got: %+v, want: %+v", got, scripts)
 	}
@@ -196,7 +196,7 @@ func TestJsExecutor_WithInitScripts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create executor: %v", err)
 	}
-	got := executor.getInitScripts()
+	got := executor.GetInitScripts()
 	if !reflect.DeepEqual(got, scripts) {
 		t.Errorf("Init scripts not set correctly, got: %+v, want: %+v", got, scripts)
 	}
@@ -320,12 +320,12 @@ func TestJsExecutor_SetInitScripts_EmptyScripts(t *testing.T) {
 	// Set non-empty first
 	scripts := []*InitScript{{FileName: "a.js", Content: "var a = 1;"}}
 	executor.SetInitScripts(scripts)
-	if got := executor.getInitScripts(); !reflect.DeepEqual(got, scripts) {
+	if got := executor.GetInitScripts(); !reflect.DeepEqual(got, scripts) {
 		t.Errorf("Expected scripts to be set")
 	}
 	// Now set empty
 	executor.SetInitScripts([]*InitScript{})
-	if got := executor.getInitScripts(); got != nil {
+	if got := executor.GetInitScripts(); got != nil {
 		t.Errorf("Expected getInitScripts to return nil when set with empty slice, got: %+v", got)
 	}
 }
@@ -341,7 +341,7 @@ func TestJsExecutor_WithInitScripts_Empty(t *testing.T) {
 	WithInitScripts()(
 		executor,
 	)
-	if got := executor.getInitScripts(); got != nil {
+	if got := executor.GetInitScripts(); got != nil {
 		t.Errorf("Expected getInitScripts to return nil when WithInitScripts is called with no scripts")
 	}
 }
