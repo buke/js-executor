@@ -41,6 +41,9 @@ type Engine struct {
 
 	// RpcScript contains the JavaScript code for handling RPC calls.
 	RpcScript string
+
+	// opts stores the original options for reloading the engine.
+	opts []Option
 }
 
 // NewFactory creates a new jsexecutor.JsEngineFactory for the V8 engine.
@@ -55,6 +58,7 @@ func newEngine(opts ...Option) (*Engine, error) {
 	e := &Engine{
 		Option:    &EngineOption{},
 		RpcScript: rpcScript, // Set default RPC script
+		opts:      opts,      // Store for Reload
 	}
 
 	// Apply user-provided options
@@ -97,18 +101,26 @@ func (e *Engine) Init(scripts []*jsexecutor.InitScript) error {
 	return nil
 }
 
-// Reload creates a new V8 context and re-initializes it, preserving the Isolate.
+// Reload performs a "hard" reload of the engine by creating a new Isolate and Context.
+// It re-applies the original options and then initializes with the provided scripts.
 func (e *Engine) Reload(scripts []*jsexecutor.InitScript) error {
-	if e.Ctx != nil {
-		e.Ctx.Close()
+	// Close the current engine and release its resources.
+	e.Close()
+
+	// Create a new engine with the original options.
+	newE, err := newEngine(e.opts...)
+	if err != nil {
+		return fmt.Errorf("failed to create new engine on reload: %w", err)
 	}
 
-	newCtx := v8NewContext(e.Iso)
-	if newCtx == nil {
-		return fmt.Errorf("failed to create new v8 context for reload")
-	}
-	e.Ctx = newCtx
+	// Replace the current engine's state with the new one.
+	e.Iso = newE.Iso
+	e.Ctx = newE.Ctx
+	e.Option = newE.Option
+	e.RpcScript = newE.RpcScript
+	e.opts = newE.opts
 
+	// Initialize the new engine with the provided scripts.
 	return e.Init(scripts)
 }
 

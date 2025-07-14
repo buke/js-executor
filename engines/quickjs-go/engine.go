@@ -20,6 +20,7 @@ type Engine struct {
 	Ctx       *quickjs.Context // QuickJS context instance
 	Option    *EngineOption    // Engine configuration options
 	RpcScript string           // Embedded RPC script for executing requests
+	opts      []Option         // Store original options for reloading
 }
 
 // Init executes the provided initialization scripts in the engine context.
@@ -33,13 +34,26 @@ func (e *Engine) Init(scripts []*jsexecutor.InitScript) error {
 	return nil
 }
 
-// Reload resets the engine context and re-initializes it with the provided scripts.
-// The old context is closed and a new one is created.
+// Reload performs a "hard" reload of the engine by creating a new runtime and context.
+// It re-applies the original options and then initializes with the provided scripts.
 func (e *Engine) Reload(scripts []*jsexecutor.InitScript) error {
-	// Close the current context and create a new one
-	e.Ctx.Close()
-	e.Ctx = e.Runtime.NewContext()
-	// Re-initialize with new scripts
+	// Close the current engine and release its resources.
+	e.Close()
+
+	// Create a new engine with the original options.
+	newE, err := newEngine(e.opts...)
+	if err != nil {
+		return fmt.Errorf("failed to create new engine on reload: %w", err)
+	}
+
+	// Replace the current engine's state with the new one.
+	e.Runtime = newE.Runtime
+	e.Ctx = newE.Ctx
+	e.Option = newE.Option
+	e.RpcScript = newE.RpcScript
+	e.opts = newE.opts
+
+	// Initialize the new engine with the provided scripts.
 	return e.Init(scripts)
 }
 
@@ -116,6 +130,7 @@ func newEngine(options ...Option) (*Engine, error) {
 			Strip:              1,     // Default strip behavior
 		},
 		RpcScript: rpcScript, // Use embedded RpcScript
+		opts:      options,   // Store for Reload
 	}
 
 	// Apply additional engine options

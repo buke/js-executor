@@ -54,6 +54,28 @@ func TestEngine_Reload(t *testing.T) {
 	require.NoError(t, engine.Reload(scripts2))
 }
 
+// TestEngine_Reload_Fails tests the failure path of the Reload method.
+func TestEngine_Reload_Fails(t *testing.T) {
+	callCount := 0
+	statefulFailingOption := func(e *Engine) error {
+		callCount++
+		if callCount > 1 {
+			return errors.New("simulated failure on second call")
+		}
+		return nil
+	}
+
+	// The first call to newEngine will succeed, storing the option.
+	engine, err := newEngine(statefulFailingOption)
+	require.NoError(t, err)
+	defer engine.Close()
+
+	// The second call to newEngine, inside Reload, should fail.
+	err = engine.Reload(nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "failed to create new engine on reload: simulated failure on second call")
+}
+
 // TestEngine_Execute_Success tests successful execution of a JS request.
 func TestEngine_Execute_Success(t *testing.T) {
 	engine, err := newEngine()

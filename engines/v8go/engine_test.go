@@ -152,7 +152,7 @@ func TestEngine_Reload_Fails(t *testing.T) {
 
 	err = engine.Reload([]*jsexecutor.InitScript{})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "failed to create new v8 context for reload")
+	require.Contains(t, err.Error(), "failed to create new engine on reload: failed to create v8 context")
 }
 
 // TestEngine_Execute tests the success path and business logic failures of the Execute method.
