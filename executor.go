@@ -60,6 +60,33 @@ func (e *JsExecutor) SetInitScripts(scripts []*InitScript) {
 	atomic.StorePointer(&e.initScriptsPtr, unsafe.Pointer(&newScripts))
 }
 
+// AppendInitScripts appends new scripts to the existing initialization scripts.
+func (e *JsExecutor) AppendInitScripts(scripts ...*InitScript) {
+	if len(scripts) == 0 {
+		return
+	}
+
+	for {
+		oldPtr := atomic.LoadPointer(&e.initScriptsPtr)
+
+		var oldScripts []*InitScript
+		if oldPtr != nil {
+			oldScripts = *(*[]*InitScript)(oldPtr)
+		}
+
+		// Create a new slice with the combined content.
+		newScripts := make([]*InitScript, len(oldScripts)+len(scripts))
+		copy(newScripts, oldScripts)
+		copy(newScripts[len(oldScripts):], scripts)
+
+		// Attempt to atomically swap the pointer.
+		if atomic.CompareAndSwapPointer(&e.initScriptsPtr, oldPtr, unsafe.Pointer(&newScripts)) {
+			break // Success
+		}
+		// If CAS fails, another goroutine updated the pointer. Retry the loop.
+	}
+}
+
 // Start initializes and starts the executor thread pool.
 func (e *JsExecutor) Start() error {
 	if e.pool == nil {

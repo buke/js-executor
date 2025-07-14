@@ -5,6 +5,7 @@ package jsexecutor
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"reflect"
 	"sync"
@@ -343,6 +344,59 @@ func TestJsExecutor_WithInitScripts_Empty(t *testing.T) {
 	)
 	if got := executor.GetInitScripts(); got != nil {
 		t.Errorf("Expected getInitScripts to return nil when WithInitScripts is called with no scripts")
+	}
+}
+
+// TestJsExecutor_AppendInitScripts tests appending initialization scripts.
+func TestJsExecutor_AppendInitScripts(t *testing.T) {
+	executor, err := NewExecutor(
+		WithJsEngine(mockEngineFactory()),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create executor: %v", err)
+	}
+
+	// 1. Append to an empty list
+	script1 := &InitScript{FileName: "1.js"}
+	executor.AppendInitScripts(script1)
+	got := executor.GetInitScripts()
+	if len(got) != 1 || got[0].FileName != "1.js" {
+		t.Errorf("Append to empty failed. Got: %+v, Want: [%+v]", got, script1)
+	}
+
+	// 2. Append to an existing list
+	script2 := &InitScript{FileName: "2.js"}
+	executor.AppendInitScripts(script2)
+	got = executor.GetInitScripts()
+	expected := []*InitScript{script1, script2}
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("Append to existing failed. Got: %+v, Want: %+v", got, expected)
+	}
+
+	// 3. Append nothing
+	executor.AppendInitScripts()
+	got = executor.GetInitScripts()
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("Append nothing should not change scripts. Got: %+v, Want: %+v", got, expected)
+	}
+}
+
+// TestJsExecutor_AppendInitScripts_Concurrent tests concurrent appends to init scripts.
+func TestJsExecutor_AppendInitScripts_Concurrent(t *testing.T) {
+	executor, _ := NewExecutor(WithJsEngine(mockEngineFactory()))
+	var wg sync.WaitGroup
+	numGoroutines := 100
+	wg.Add(numGoroutines)
+	for i := 0; i < numGoroutines; i++ {
+		go func(i int) {
+			defer wg.Done()
+			executor.AppendInitScripts(&InitScript{FileName: fmt.Sprintf("s%d.js", i)})
+		}(i)
+	}
+	wg.Wait()
+	finalScripts := executor.GetInitScripts()
+	if len(finalScripts) != numGoroutines {
+		t.Fatalf("Expected %d scripts after concurrent appends, but got %d", numGoroutines, len(finalScripts))
 	}
 }
 
