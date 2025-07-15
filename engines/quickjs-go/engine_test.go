@@ -73,7 +73,7 @@ func TestEngine_Reload_Fails(t *testing.T) {
 	// The second call to newEngine, inside Reload, should fail.
 	err = engine.Reload(nil)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "failed to create new engine on reload: simulated failure on second call")
+	require.Contains(t, err.Error(), "failed to apply option: simulated failure on second call")
 }
 
 // TestEngine_Execute_Success tests successful execution of a JS request.
