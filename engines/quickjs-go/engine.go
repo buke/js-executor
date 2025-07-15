@@ -40,18 +40,16 @@ func (e *Engine) Reload(scripts []*jsexecutor.InitScript) error {
 	// Close the current engine and release its resources.
 	e.Close()
 
-	// Create a new engine with the original options.
-	newE, err := newEngine(e.opts...)
-	if err != nil {
-		return fmt.Errorf("failed to create new engine on reload: %w", err)
-	}
+	e.Runtime = quickjs.NewRuntime()
+	e.Ctx = e.Runtime.NewContext()
 
-	// Replace the current engine's state with the new one.
-	e.Runtime = newE.Runtime
-	e.Ctx = newE.Ctx
-	e.Option = newE.Option
-	e.RpcScript = newE.RpcScript
-	e.opts = newE.opts
+	// Apply additional engine options
+	for _, option := range e.opts {
+		if err := option(e); err != nil {
+			e.Close()
+			return fmt.Errorf("failed to apply option: %w", err)
+		}
+	}
 
 	// Initialize the new engine with the provided scripts.
 	return e.Init(scripts)
