@@ -12,13 +12,13 @@ import (
 
 // TestIntegration_ExecutorWithQuickJS tests basic integration of JsExecutor with the QuickJS engine.
 func TestIntegration_ExecutorWithQuickJS(t *testing.T) {
-	initScript := &jsexecutor.InitScript{
+	jsScript := &jsexecutor.JsScript{
 		FileName: "hello.js",
 		Content:  `function hello(name) { return "Hi, " + name + "!"; }`,
 	}
 	executor, err := jsexecutor.NewExecutor(
 		jsexecutor.WithJsEngine(quickjsengine.NewFactory()),
-		jsexecutor.WithInitScripts(initScript),
+		jsexecutor.WithJsScripts(jsScript),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, executor)
@@ -41,13 +41,13 @@ func TestIntegration_ExecutorWithQuickJS(t *testing.T) {
 
 // TestIntegration_ExecutorWithQuickJS_ConcurrentTasks tests concurrent task execution with QuickJS engine.
 func TestIntegration_ExecutorWithQuickJS_ConcurrentTasks(t *testing.T) {
-	initScript := &jsexecutor.InitScript{
+	jsScript := &jsexecutor.JsScript{
 		FileName: "hello.js",
 		Content:  `function hello(name) { return "Hi, " + name + "!"; }`,
 	}
 	executor, err := jsexecutor.NewExecutor(
 		jsexecutor.WithJsEngine(quickjsengine.NewFactory()),
-		jsexecutor.WithInitScripts(initScript),
+		jsexecutor.WithJsScripts(jsScript),
 		jsexecutor.WithMinPoolSize(2),
 		jsexecutor.WithMaxPoolSize(4),
 		jsexecutor.WithQueueSize(2),

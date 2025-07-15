@@ -30,57 +30,57 @@ type JsExecutor struct {
 	pool          *pool             // Thread pool
 	engineFactory JsEngineFactory   // JavaScript engine factory function
 
-	// Use atomic pointer for lock-free, zero-copy reads of initScripts.
-	initScriptsPtr unsafe.Pointer // Points to []*InitScript (atomic access)
+	// Use atomic pointer for lock-free, zero-copy reads of jsScripts.
+	jsScriptsPtr unsafe.Pointer // Points to []*JsScript (atomic access)
 
 	logger *slog.Logger // Logger instance
 }
 
-// getInitScripts returns the current initialization scripts (no copy, read-only).
-func (e *JsExecutor) GetInitScripts() []*InitScript {
-	ptr := atomic.LoadPointer(&e.initScriptsPtr)
+// GetJsScripts returns the current initialization scripts (no copy, read-only).
+func (e *JsExecutor) GetJsScripts() []*JsScript {
+	ptr := atomic.LoadPointer(&e.jsScriptsPtr)
 	if ptr == nil {
 		return nil
 	}
-	return *(*[]*InitScript)(ptr)
+	return *(*[]*JsScript)(ptr)
 }
 
-// setInitScripts atomically sets new initialization scripts.
-func (e *JsExecutor) SetInitScripts(scripts []*InitScript) {
+// SetJsScripts atomically sets new initialization scripts.
+func (e *JsExecutor) SetJsScripts(scripts []*JsScript) {
 	if len(scripts) == 0 {
-		atomic.StorePointer(&e.initScriptsPtr, nil)
+		atomic.StorePointer(&e.jsScriptsPtr, nil)
 		return
 	}
 
 	// Create immutable copy once during write.
-	newScripts := make([]*InitScript, len(scripts))
+	newScripts := make([]*JsScript, len(scripts))
 	copy(newScripts, scripts)
 
 	// Atomically replace the pointer.
-	atomic.StorePointer(&e.initScriptsPtr, unsafe.Pointer(&newScripts))
+	atomic.StorePointer(&e.jsScriptsPtr, unsafe.Pointer(&newScripts))
 }
 
-// AppendInitScripts appends new scripts to the existing initialization scripts.
-func (e *JsExecutor) AppendInitScripts(scripts ...*InitScript) {
+// AppendJsScripts appends new scripts to the existing initialization scripts.
+func (e *JsExecutor) AppendJsScripts(scripts ...*JsScript) {
 	if len(scripts) == 0 {
 		return
 	}
 
 	for {
-		oldPtr := atomic.LoadPointer(&e.initScriptsPtr)
+		oldPtr := atomic.LoadPointer(&e.jsScriptsPtr)
 
-		var oldScripts []*InitScript
+		var oldScripts []*JsScript
 		if oldPtr != nil {
-			oldScripts = *(*[]*InitScript)(oldPtr)
+			oldScripts = *(*[]*JsScript)(oldPtr)
 		}
 
 		// Create a new slice with the combined content.
-		newScripts := make([]*InitScript, len(oldScripts)+len(scripts))
+		newScripts := make([]*JsScript, len(oldScripts)+len(scripts))
 		copy(newScripts, oldScripts)
 		copy(newScripts[len(oldScripts):], scripts)
 
 		// Attempt to atomically swap the pointer.
-		if atomic.CompareAndSwapPointer(&e.initScriptsPtr, oldPtr, unsafe.Pointer(&newScripts)) {
+		if atomic.CompareAndSwapPointer(&e.jsScriptsPtr, oldPtr, unsafe.Pointer(&newScripts)) {
 			break // Success
 		}
 		// If CAS fails, another goroutine updated the pointer. Retry the loop.
@@ -124,13 +124,13 @@ func (e *JsExecutor) Stop() error {
 }
 
 // Reload reloads all threads with new initialization scripts.
-func (e *JsExecutor) Reload(scripts ...*InitScript) error {
+func (e *JsExecutor) Reload(scripts ...*JsScript) error {
 	if e.pool == nil {
 		return fmt.Errorf("thread pool is not initialized")
 	}
 
 	if len(scripts) > 0 {
-		e.SetInitScripts(scripts) // Use safe setter method.
+		e.SetJsScripts(scripts) // Use safe setter method.
 	}
 
 	return e.pool.reload()
@@ -183,11 +183,11 @@ func WithLogger(logger *slog.Logger) func(*JsExecutor) {
 	}
 }
 
-// WithInitScripts configures the initialization scripts.
-func WithInitScripts(scripts ...*InitScript) func(*JsExecutor) {
+// WithJsScripts configures the initialization scripts.
+func WithJsScripts(scripts ...*JsScript) func(*JsExecutor) {
 	return func(executor *JsExecutor) {
 		if len(scripts) > 0 {
-			executor.SetInitScripts(scripts) // Use safe setter method.
+			executor.SetJsScripts(scripts) // Use safe setter method.
 		}
 	}
 }

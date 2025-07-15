@@ -14,7 +14,7 @@ import (
 func TestIntegration_GojaExecutor_Async(t *testing.T) {
 	// Prepare an initialization script that defines an async JS function.
 	// Using an async function with a timeout ensures we test the event loop.
-	initScript := &jsexecutor.InitScript{
+	jsScript := &jsexecutor.JsScript{
 		FileName: "hello_async.js",
 		Content: `
             async function hello(name) {
@@ -28,7 +28,7 @@ func TestIntegration_GojaExecutor_Async(t *testing.T) {
 	// Create a JsExecutor with the Goja engine factory and options.
 	executor, err := jsexecutor.NewExecutor(
 		jsexecutor.WithJsEngine(NewFactory()),
-		jsexecutor.WithInitScripts(initScript),
+		jsexecutor.WithJsScripts(jsScript),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, executor)
@@ -58,7 +58,7 @@ func TestIntegration_GojaExecutor_Async(t *testing.T) {
 // TestIntegration_GojaExecutor_Sync tests a synchronous JS function.
 func TestIntegration_GojaExecutor_Sync(t *testing.T) {
 	// Prepare an initialization script that defines a simple synchronous function.
-	initScript := &jsexecutor.InitScript{
+	jsScript := &jsexecutor.JsScript{
 		FileName: "hello_sync.js",
 		Content: `
             function hello(name) {
@@ -70,7 +70,7 @@ func TestIntegration_GojaExecutor_Sync(t *testing.T) {
 	// Create a JsExecutor with the Goja engine factory and options.
 	executor, err := jsexecutor.NewExecutor(
 		jsexecutor.WithJsEngine(NewFactory()),
-		jsexecutor.WithInitScripts(initScript),
+		jsexecutor.WithJsScripts(jsScript),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, executor)

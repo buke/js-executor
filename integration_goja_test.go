@@ -12,13 +12,13 @@ import (
 
 // TestIntegration_ExecutorWithGoja tests basic integration of JsExecutor with the Goja engine.
 func TestIntegration_ExecutorWithGoja(t *testing.T) {
-	initScript := &jsexecutor.InitScript{
+	jsScript := &jsexecutor.JsScript{
 		FileName: "hello.js",
 		Content:  `function hello(name) { return "Hello, " + name + "!"; }`,
 	}
 	executor, err := jsexecutor.NewExecutor(
 		jsexecutor.WithJsEngine(gojaengine.NewFactory()),
-		jsexecutor.WithInitScripts(initScript),
+		jsexecutor.WithJsScripts(jsScript),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, executor)
@@ -41,13 +41,13 @@ func TestIntegration_ExecutorWithGoja(t *testing.T) {
 
 // TestIntegration_ExecutorWithGoja_ConcurrentTasks tests concurrent task execution with Goja engine.
 func TestIntegration_ExecutorWithGoja_ConcurrentTasks(t *testing.T) {
-	initScript := &jsexecutor.InitScript{
+	jsScript := &jsexecutor.JsScript{
 		FileName: "hello.js",
 		Content:  `function hello(name) { return "Hello, " + name + "!"; }`,
 	}
 	executor, err := jsexecutor.NewExecutor(
 		jsexecutor.WithJsEngine(gojaengine.NewFactory()),
-		jsexecutor.WithInitScripts(initScript),
+		jsexecutor.WithJsScripts(jsScript),
 		jsexecutor.WithMinPoolSize(2),
 		jsexecutor.WithMaxPoolSize(4),
 		jsexecutor.WithQueueSize(2),

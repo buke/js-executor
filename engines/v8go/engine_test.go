@@ -55,7 +55,6 @@ func TestNewEngine_Fails(t *testing.T) {
 		v8NewIsolate = func() *v8go.Isolate {
 			return nil
 		}
-		// Restore the original function after the test
 		defer func() {
 			v8NewIsolate = originalNewIsolate
 		}()
@@ -66,13 +65,10 @@ func TestNewEngine_Fails(t *testing.T) {
 	})
 
 	t.Run("Context Creation Fails", func(t *testing.T) {
-		// Monkey-patch the context creation to simulate failure
 		originalNewContext := v8NewContext
-		// The mock function must have the correct signature to match the original.
 		v8NewContext = func(opt ...v8go.ContextOption) *v8go.Context {
 			return nil
 		}
-		// Restore the original function after the test
 		defer func() {
 			v8NewContext = originalNewContext
 		}()
@@ -90,20 +86,20 @@ func TestEngine_Init(t *testing.T) {
 	defer engine.Close()
 
 	t.Run("Success", func(t *testing.T) {
-		script := &jsexecutor.InitScript{
+		script := &jsexecutor.JsScript{
 			FileName: "test.js",
 			Content:  "var a = 1;",
 		}
-		err := engine.Init([]*jsexecutor.InitScript{script})
+		err := engine.Init([]*jsexecutor.JsScript{script})
 		require.NoError(t, err)
 	})
 
 	t.Run("Invalid Script", func(t *testing.T) {
-		script := &jsexecutor.InitScript{
+		script := &jsexecutor.JsScript{
 			FileName: "invalid.js",
 			Content:  "var a =;",
 		}
-		err := engine.Init([]*jsexecutor.InitScript{script})
+		err := engine.Init([]*jsexecutor.JsScript{script})
 		require.Error(t, err)
 	})
 }
@@ -119,8 +115,8 @@ func TestEngine_Reload(t *testing.T) {
 	require.NoError(t, err)
 
 	// Reload with a new script
-	newScript := &jsexecutor.InitScript{FileName: "new.js", Content: "var newVar = 'new';"}
-	err = engine.Reload([]*jsexecutor.InitScript{newScript})
+	newScript := &jsexecutor.JsScript{FileName: "new.js", Content: "var newVar = 'new';"}
+	err = engine.Reload([]*jsexecutor.JsScript{newScript})
 	require.NoError(t, err)
 
 	// Verify the old variable does not exist
@@ -140,9 +136,7 @@ func TestEngine_Reload_Fails(t *testing.T) {
 	require.NoError(t, err)
 	defer engine.Close()
 
-	// Monkey-patch the context creation to simulate failure
 	originalNewContext := v8NewContext
-	// The mock function must have the correct signature to match the original.
 	v8NewContext = func(opt ...v8go.ContextOption) *v8go.Context {
 		return nil
 	}
@@ -150,7 +144,7 @@ func TestEngine_Reload_Fails(t *testing.T) {
 		v8NewContext = originalNewContext
 	}()
 
-	err = engine.Reload([]*jsexecutor.InitScript{})
+	err = engine.Reload([]*jsexecutor.JsScript{})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "failed to create new engine on reload: failed to create v8 context")
 }
@@ -162,8 +156,8 @@ func TestEngine_Execute(t *testing.T) {
 	defer engine.Close()
 
 	// Init a simple function
-	initScript := &jsexecutor.InitScript{FileName: "test.js", Content: "function add(a, b) { return a + b; }"}
-	err = engine.Init([]*jsexecutor.InitScript{initScript})
+	initScript := &jsexecutor.JsScript{FileName: "test.js", Content: "function add(a, b) { return a + b; }"}
+	err = engine.Init([]*jsexecutor.JsScript{initScript})
 	require.NoError(t, err)
 
 	t.Run("Success", func(t *testing.T) {
@@ -174,7 +168,6 @@ func TestEngine_Execute(t *testing.T) {
 		resp, err := engine.Execute(req)
 		require.NoError(t, err)
 		require.NotNil(t, resp)
-		// Note: JSON unmarshaling will result in float64 for numbers
 		require.Equal(t, 5.0, resp.Result)
 	})
 
@@ -182,7 +175,6 @@ func TestEngine_Execute(t *testing.T) {
 		req := &jsexecutor.JsRequest{
 			Service: "nonExistentFunc",
 		}
-		// The error is now returned directly from the Execute method.
 		resp, err := engine.Execute(req)
 		require.Error(t, err)
 		require.Nil(t, resp)
@@ -193,8 +185,6 @@ func TestEngine_Execute(t *testing.T) {
 // TestEngine_Execute_Fails tests the technical failure paths of the Execute method.
 func TestEngine_Execute_Fails(t *testing.T) {
 	t.Run("RPC Script Execution Fails", func(t *testing.T) {
-		// This script is syntactically valid but throws an error immediately when run.
-		// This tests the error path of `e.Ctx.RunScript`.
 		engine, err := newEngine(WithRpcScript(`throw new Error('boom');`))
 		require.NoError(t, err)
 		defer engine.Close()
@@ -202,7 +192,7 @@ func TestEngine_Execute_Fails(t *testing.T) {
 		_, err = engine.Execute(&jsexecutor.JsRequest{})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to run rpc script")
-		require.Contains(t, err.Error(), "boom") // Check for the original error message
+		require.Contains(t, err.Error(), "boom")
 	})
 	t.Run("RPC Script is not a function", func(t *testing.T) {
 		engine, err := newEngine(WithRpcScript(`"a string, not a function"`))
@@ -215,8 +205,6 @@ func TestEngine_Execute_Fails(t *testing.T) {
 	})
 
 	t.Run("RPC Function Call Fails", func(t *testing.T) {
-		// This script is a non-async function that throws a synchronous error.
-		// This should cause the `rpcFn.Call` method itself to return an error.
 		engine, err := newEngine(WithRpcScript(`() => { throw new Error('synchronous boom'); }`))
 		require.NoError(t, err)
 		defer engine.Close()
@@ -242,7 +230,6 @@ func TestEngine_Execute_Fails(t *testing.T) {
 		require.NoError(t, err)
 		defer engine.Close()
 
-		// Channels cannot be marshaled to JSON
 		req := &jsexecutor.JsRequest{
 			Args: []interface{}{make(chan int)},
 		}
@@ -256,14 +243,11 @@ func TestEngine_Execute_Fails(t *testing.T) {
 		require.NoError(t, err)
 		defer engine.Close()
 
-		// Mock v8NewValue to fail on the second call (the one with the JSON string)
 		originalNewValue := v8NewValue
 		v8NewValue = func(iso *v8go.Isolate, val any) (*v8go.Value, error) {
-			// The first call with the struct should fail to enter the fallback logic.
 			if _, ok := val.(*jsexecutor.JsRequest); ok {
 				return nil, errors.New("mock error: cannot convert struct")
 			}
-			// The second call with the string must also fail to hit our target branch.
 			return nil, errors.New("mock error: cannot convert string")
 		}
 		defer func() { v8NewValue = originalNewValue }()
@@ -274,30 +258,25 @@ func TestEngine_Execute_Fails(t *testing.T) {
 	})
 
 	t.Run("Response Marshal Fails (Circular Reference)", func(t *testing.T) {
-		// This script creates an object with a circular reference, which cannot be JSON.stringified.
 		circularScript := `function circular() { let a = {}; a.b = a; return a; }`
 		engine, err := newEngine()
 		require.NoError(t, err)
 		defer engine.Close()
-		err = engine.Init([]*jsexecutor.InitScript{{FileName: "circular.js", Content: circularScript}})
+		err = engine.Init([]*jsexecutor.JsScript{{FileName: "circular.js", Content: circularScript}})
 		require.NoError(t, err)
 
 		req := &jsexecutor.JsRequest{Service: "circular"}
 		_, err = engine.Execute(req)
 		require.Error(t, err)
-		// v8go's MarshalJSON on a circular reference returns an empty byte slice without an error.
-		// We catch this specific case.
 		require.Contains(t, err.Error(), "failed to marshal response value to json: result is empty")
 	})
 
 	t.Run("Response Unmarshal Fails", func(t *testing.T) {
-		// This script returns a valid JSON, but its structure doesn't match JsResponse.
 		mismatchScript := `async () => ({ id: 123, result: "ok" })`
 		engine, err := newEngine(WithRpcScript(mismatchScript))
 		require.NoError(t, err)
 		defer engine.Close()
 
-		// We mock json.Unmarshal to trigger the error reliably.
 		originalUnmarshal := jsonUnmarshal
 		jsonUnmarshal = func(data []byte, v any) error {
 			return errors.New("unmarshal error")

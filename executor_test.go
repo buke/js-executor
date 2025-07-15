@@ -15,23 +15,23 @@ import (
 
 // mockEngine is a simple mock implementation of JsEngine for testing.
 type mockEngine struct {
-	mu           sync.Mutex    // Mutex for concurrent access
-	initCalled   bool          // Whether Init was called
-	reloadCalled bool          // Whether Reload was called
-	closeCalled  bool          // Whether Close was called
-	initScripts  []*InitScript // Scripts passed to Init/Reload
-	executedReq  *JsRequest    // Last executed request
-	executeResp  *JsResponse   // Response to return from Execute
-	executeErr   error         // Error to return from Execute
+	mu           sync.Mutex  // Mutex for concurrent access
+	initCalled   bool        // Whether Init was called
+	reloadCalled bool        // Whether Reload was called
+	closeCalled  bool        // Whether Close was called
+	initScripts  []*JsScript // Scripts passed to Init/Reload
+	executedReq  *JsRequest  // Last executed request
+	executeResp  *JsResponse // Response to return from Execute
+	executeErr   error       // Error to return from Execute
 
-	initFunc    func(scripts []*InitScript) error         // Custom Init behavior (if set)
-	reloadFunc  func(scripts []*InitScript) error         // Custom Reload behavior (if set)
+	initFunc    func(scripts []*JsScript) error           // Custom Init behavior (if set)
+	reloadFunc  func(scripts []*JsScript) error           // Custom Reload behavior (if set)
 	executeFunc func(req *JsRequest) (*JsResponse, error) // Custom Execute behavior (if set)
 	closeFunc   func() error                              // Custom Close behavior (if set)
 }
 
 // Init mocks the initialization of the JavaScript engine.
-func (m *mockEngine) Init(scripts []*InitScript) error {
+func (m *mockEngine) Init(scripts []*JsScript) error {
 	m.mu.Lock()
 	m.initCalled = true
 	m.initScripts = scripts
@@ -43,7 +43,7 @@ func (m *mockEngine) Init(scripts []*InitScript) error {
 }
 
 // Reload mocks reloading the JavaScript engine with new scripts.
-func (m *mockEngine) Reload(scripts []*InitScript) error {
+func (m *mockEngine) Reload(scripts []*JsScript) error {
 	m.reloadCalled = true
 	m.initScripts = scripts
 	if m.reloadFunc != nil {
@@ -143,13 +143,13 @@ func TestJsExecutor_Reload(t *testing.T) {
 	}
 	defer executor.Stop()
 
-	scripts := []*InitScript{
+	scripts := []*JsScript{
 		{FileName: "a.js", Content: "var a = 1;"},
 	}
 	if err := executor.Reload(scripts...); err != nil {
 		t.Fatalf("Reload failed: %v", err)
 	}
-	got := executor.GetInitScripts()
+	got := executor.GetJsScripts()
 	if !reflect.DeepEqual(got, scripts) {
 		t.Errorf("Reload did not set scripts correctly, got: %+v, want: %+v", got, scripts)
 	}
@@ -187,17 +187,17 @@ func TestJsExecutor_WithThresholds(t *testing.T) {
 
 // TestJsExecutor_WithInitScripts tests setting initialization scripts via option.
 func TestJsExecutor_WithInitScripts(t *testing.T) {
-	scripts := []*InitScript{
+	scripts := []*JsScript{
 		{FileName: "init.js", Content: "var x = 1;"},
 	}
 	executor, err := NewExecutor(
 		WithJsEngine(mockEngineFactory()),
-		WithInitScripts(scripts...),
+		WithJsScripts(scripts...),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create executor: %v", err)
 	}
-	got := executor.GetInitScripts()
+	got := executor.GetJsScripts()
 	if !reflect.DeepEqual(got, scripts) {
 		t.Errorf("Init scripts not set correctly, got: %+v, want: %+v", got, scripts)
 	}
@@ -257,7 +257,7 @@ func TestJsExecutor_Execute_ErrorWhenPoolNotStarted(t *testing.T) {
 // TestJsExecutor_Reload_ErrorWhenPoolNotStarted tests error when reloading without starting the pool.
 func TestJsExecutor_Reload_ErrorWhenPoolNotStarted(t *testing.T) {
 	executor := &JsExecutor{}
-	err := executor.Reload(&InitScript{FileName: "a.js", Content: "var a = 1;"})
+	err := executor.Reload(&JsScript{FileName: "a.js", Content: "var a = 1;"})
 	if err == nil {
 		t.Error("Expected error when pool is not initialized")
 	}
@@ -319,19 +319,19 @@ func TestJsExecutor_SetInitScripts_EmptyScripts(t *testing.T) {
 		t.Fatalf("Failed to create executor: %v", err)
 	}
 	// Set non-empty first
-	scripts := []*InitScript{{FileName: "a.js", Content: "var a = 1;"}}
-	executor.SetInitScripts(scripts)
-	if got := executor.GetInitScripts(); !reflect.DeepEqual(got, scripts) {
+	scripts := []*JsScript{{FileName: "a.js", Content: "var a = 1;"}}
+	executor.SetJsScripts(scripts)
+	if got := executor.GetJsScripts(); !reflect.DeepEqual(got, scripts) {
 		t.Errorf("Expected scripts to be set")
 	}
 	// Now set empty
-	executor.SetInitScripts([]*InitScript{})
-	if got := executor.GetInitScripts(); got != nil {
-		t.Errorf("Expected getInitScripts to return nil when set with empty slice, got: %+v", got)
+	executor.SetJsScripts([]*JsScript{})
+	if got := executor.GetJsScripts(); got != nil {
+		t.Errorf("Expected GetJsScripts to return nil when set with empty slice, got: %+v", got)
 	}
 }
 
-// TestJsExecutor_WithInitScripts_Empty tests WithInitScripts with no scripts.
+// TestJsExecutor_WithInitScripts_Empty tests WithJsScripts with no scripts.
 func TestJsExecutor_WithInitScripts_Empty(t *testing.T) {
 	executor, err := NewExecutor(
 		WithJsEngine(mockEngineFactory()),
@@ -339,11 +339,11 @@ func TestJsExecutor_WithInitScripts_Empty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create executor: %v", err)
 	}
-	WithInitScripts()(
+	WithJsScripts()(
 		executor,
 	)
-	if got := executor.GetInitScripts(); got != nil {
-		t.Errorf("Expected getInitScripts to return nil when WithInitScripts is called with no scripts")
+	if got := executor.GetJsScripts(); got != nil {
+		t.Errorf("Expected GetJsScripts to return nil when WithJsScripts is called with no scripts")
 	}
 }
 
@@ -357,25 +357,25 @@ func TestJsExecutor_AppendInitScripts(t *testing.T) {
 	}
 
 	// 1. Append to an empty list
-	script1 := &InitScript{FileName: "1.js"}
-	executor.AppendInitScripts(script1)
-	got := executor.GetInitScripts()
+	script1 := &JsScript{FileName: "1.js"}
+	executor.AppendJsScripts(script1)
+	got := executor.GetJsScripts()
 	if len(got) != 1 || got[0].FileName != "1.js" {
 		t.Errorf("Append to empty failed. Got: %+v, Want: [%+v]", got, script1)
 	}
 
 	// 2. Append to an existing list
-	script2 := &InitScript{FileName: "2.js"}
-	executor.AppendInitScripts(script2)
-	got = executor.GetInitScripts()
-	expected := []*InitScript{script1, script2}
+	script2 := &JsScript{FileName: "2.js"}
+	executor.AppendJsScripts(script2)
+	got = executor.GetJsScripts()
+	expected := []*JsScript{script1, script2}
 	if !reflect.DeepEqual(got, expected) {
 		t.Errorf("Append to existing failed. Got: %+v, Want: %+v", got, expected)
 	}
 
 	// 3. Append nothing
-	executor.AppendInitScripts()
-	got = executor.GetInitScripts()
+	executor.AppendJsScripts()
+	got = executor.GetJsScripts()
 	if !reflect.DeepEqual(got, expected) {
 		t.Errorf("Append nothing should not change scripts. Got: %+v, Want: %+v", got, expected)
 	}
@@ -390,11 +390,11 @@ func TestJsExecutor_AppendInitScripts_Concurrent(t *testing.T) {
 	for i := 0; i < numGoroutines; i++ {
 		go func(i int) {
 			defer wg.Done()
-			executor.AppendInitScripts(&InitScript{FileName: fmt.Sprintf("s%d.js", i)})
+			executor.AppendJsScripts(&JsScript{FileName: fmt.Sprintf("s%d.js", i)})
 		}(i)
 	}
 	wg.Wait()
-	finalScripts := executor.GetInitScripts()
+	finalScripts := executor.GetJsScripts()
 	if len(finalScripts) != numGoroutines {
 		t.Fatalf("Expected %d scripts after concurrent appends, but got %d", numGoroutines, len(finalScripts))
 	}
@@ -410,7 +410,7 @@ func TestJsExecutor_ConcurrentReloadAndExecute(t *testing.T) {
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
-			_ = executor.Reload(&InitScript{FileName: "a.js", Content: "var a=1;"})
+			_ = executor.Reload(&JsScript{FileName: "a.js", Content: "var a=1;"})
 		}()
 		go func() {
 			defer wg.Done()

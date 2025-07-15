@@ -16,7 +16,7 @@ import (
 func mockEngineFactoryWithError(reloadErr, execErr error) JsEngineFactory {
 	return func() (JsEngine, error) {
 		return &mockEngine{
-			reloadFunc: func(scripts []*InitScript) error {
+			reloadFunc: func(scripts []*JsScript) error {
 				return reloadErr
 			},
 			executeFunc: func(req *JsRequest) (*JsResponse, error) {

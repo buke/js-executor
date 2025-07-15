@@ -25,7 +25,7 @@ type Engine struct {
 
 // Init executes the provided initialization scripts in the engine context.
 // Each script is evaluated in order. If any script fails, an error is returned.
-func (e *Engine) Init(scripts []*jsexecutor.InitScript) error {
+func (e *Engine) Init(scripts []*jsexecutor.JsScript) error {
 	for _, script := range scripts {
 		if err := e.Ctx.Eval(script.Content, quickjs.EvalFileName(script.FileName), quickjs.EvalAwait(true)); err.IsException() {
 			return fmt.Errorf("failed to execute init script %s: %w", script.FileName, e.Ctx.Exception())
@@ -36,7 +36,7 @@ func (e *Engine) Init(scripts []*jsexecutor.InitScript) error {
 
 // Reload performs a "hard" reload of the engine by creating a new runtime and context.
 // It re-applies the original options and then initializes with the provided scripts.
-func (e *Engine) Reload(scripts []*jsexecutor.InitScript) error {
+func (e *Engine) Reload(scripts []*jsexecutor.JsScript) error {
 	// Close the current engine and release its resources.
 	e.Close()
 

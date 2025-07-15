@@ -17,7 +17,7 @@ func TestEngine_Init_Success(t *testing.T) {
 	require.NoError(t, err)
 	defer engine.Close()
 
-	scripts := []*jsexecutor.InitScript{
+	scripts := []*jsexecutor.JsScript{
 		{FileName: "init.js", Content: "function add(a, b) { return a + b; }"},
 	}
 	err = engine.Init(scripts)
@@ -30,7 +30,7 @@ func TestEngine_Init_ScriptError(t *testing.T) {
 	require.NoError(t, err)
 	defer engine.Close()
 
-	scripts := []*jsexecutor.InitScript{
+	scripts := []*jsexecutor.JsScript{
 		{FileName: "bad.js", Content: "function () { syntax error }"},
 	}
 	err = engine.Init(scripts)
@@ -43,12 +43,12 @@ func TestEngine_Reload(t *testing.T) {
 	require.NoError(t, err)
 	defer engine.Close()
 
-	scripts1 := []*jsexecutor.InitScript{
+	scripts1 := []*jsexecutor.JsScript{
 		{FileName: "a.js", Content: "function foo() { return 1; }"},
 	}
 	require.NoError(t, engine.Init(scripts1))
 
-	scripts2 := []*jsexecutor.InitScript{
+	scripts2 := []*jsexecutor.JsScript{
 		{FileName: "b.js", Content: "function foo() { return 2; }"},
 	}
 	require.NoError(t, engine.Reload(scripts2))
@@ -82,7 +82,7 @@ func TestEngine_Execute_Success(t *testing.T) {
 	require.NoError(t, err)
 	defer engine.Close()
 
-	scripts := []*jsexecutor.InitScript{
+	scripts := []*jsexecutor.JsScript{
 		{FileName: "add.js", Content: "function add(a, b) { return a + b; }"},
 	}
 	require.NoError(t, engine.Init(scripts))
@@ -103,7 +103,7 @@ func TestEngine_Execute_Exception(t *testing.T) {
 	require.NoError(t, err)
 	defer engine.Close()
 
-	scripts := []*jsexecutor.InitScript{
+	scripts := []*jsexecutor.JsScript{
 		{FileName: "empty.js", Content: ""},
 	}
 	require.NoError(t, engine.Init(scripts))
@@ -151,7 +151,7 @@ func TestEngine_Execute_EvalRpcScriptException(t *testing.T) {
 
 	// Set an invalid RPC script to trigger Eval exception
 	engine.RpcScript = "throw new Error('bad rpc script');"
-	scripts := []*jsexecutor.InitScript{}
+	scripts := []*jsexecutor.JsScript{}
 	require.NoError(t, engine.Init(scripts))
 
 	req := &jsexecutor.JsRequest{
@@ -194,7 +194,7 @@ func TestEngine_Execute_UnmarshalResponseError(t *testing.T) {
 
 	engine.RpcScript = `(req) => Symbol("x")`
 
-	scripts := []*jsexecutor.InitScript{}
+	scripts := []*jsexecutor.JsScript{}
 	require.NoError(t, engine.Init(scripts))
 
 	req := &jsexecutor.JsRequest{

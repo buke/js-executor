@@ -51,11 +51,11 @@ func TestEngine_Init(t *testing.T) {
 	require.NotNil(t, engine)
 	defer engine.Close()
 
-	initScript := &jsexecutor.InitScript{
+	jsScript := &jsexecutor.JsScript{
 		FileName: "test.js",
 		Content:  "var a = 10;",
 	}
-	err = engine.Init([]*jsexecutor.InitScript{initScript})
+	err = engine.Init([]*jsexecutor.JsScript{jsScript})
 	require.NoError(t, err)
 
 	gojaEngine := engine.(*Engine)
@@ -73,11 +73,11 @@ func TestEngine_Init_Error(t *testing.T) {
 	require.NotNil(t, engine)
 	defer engine.Close()
 
-	initScript := &jsexecutor.InitScript{
+	jsScript := &jsexecutor.JsScript{
 		FileName: "error.js",
 		Content:  "var a =;", // Syntax error
 	}
-	err = engine.Init([]*jsexecutor.InitScript{initScript})
+	err = engine.Init([]*jsexecutor.JsScript{jsScript})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "failed to execute init script")
 }
@@ -88,12 +88,12 @@ func TestEngine_Reload(t *testing.T) {
 	require.NotNil(t, engine)
 	defer engine.Close()
 
-	initScript1 := &jsexecutor.InitScript{FileName: "v1.js", Content: "var version = 1;"}
-	err = engine.Init([]*jsexecutor.InitScript{initScript1})
+	jsScript1 := &jsexecutor.JsScript{FileName: "v1.js", Content: "var version = 1;"}
+	err = engine.Init([]*jsexecutor.JsScript{jsScript1})
 	require.NoError(t, err)
 
-	initScript2 := &jsexecutor.InitScript{FileName: "v2.js", Content: "var version = 2;"}
-	err = engine.Reload([]*jsexecutor.InitScript{initScript2})
+	jsScript2 := &jsexecutor.JsScript{FileName: "v2.js", Content: "var version = 2;"}
+	err = engine.Reload([]*jsexecutor.JsScript{jsScript2})
 	require.NoError(t, err)
 
 	gojaEngine := engine.(*Engine)
@@ -136,11 +136,11 @@ func TestEngine_Execute_RejectedPromise(t *testing.T) {
 	require.NoError(t, err)
 	defer engine.Close()
 
-	initScript := &jsexecutor.InitScript{
+	jsScript := &jsexecutor.JsScript{
 		FileName: "reject.js",
 		Content:  "function fail() { return Promise.reject('a serious error'); }",
 	}
-	err = engine.Init([]*jsexecutor.InitScript{initScript})
+	err = engine.Init([]*jsexecutor.JsScript{jsScript})
 	require.NoError(t, err)
 
 	req := &jsexecutor.JsRequest{Service: "fail"}
@@ -154,11 +154,11 @@ func TestEngine_Execute_NonPromiseReturn(t *testing.T) {
 	require.NoError(t, err)
 	defer engine.Close()
 
-	initScript := &jsexecutor.InitScript{
+	jsScript := &jsexecutor.JsScript{
 		FileName: "non_promise.js",
 		Content:  "function nonPromise() { return { message: 'not a promise' }; }",
 	}
-	err = engine.Init([]*jsexecutor.InitScript{initScript})
+	err = engine.Init([]*jsexecutor.JsScript{jsScript})
 	require.NoError(t, err)
 
 	req := &jsexecutor.JsRequest{Service: "nonPromise"}
@@ -250,10 +250,10 @@ func TestEngine_Execute_InvokeThenError(t *testing.T) {
 	// This script returns a "thenable" object whose .then method throws an error when called.
 	// This covers the final error branch in the Execute method.
 	mockScript := `() => ({
-		then: function(onSuccess, onError) {
-			throw new Error('I am a broken .then method');
-		}
-	})`
+        then: function(onSuccess, onError) {
+            throw new Error('I am a broken .then method');
+        }
+    })`
 	withMockRpcScript(mockScript, t, func(t *testing.T) {
 		engine, err := NewFactory()()
 		require.NoError(t, err)
@@ -271,11 +271,11 @@ func TestEngine_Execute_Sync(t *testing.T) {
 	require.NotNil(t, engine)
 	defer engine.Close()
 
-	initScript := &jsexecutor.InitScript{
+	jsScript := &jsexecutor.JsScript{
 		FileName: "sync.js",
 		Content:  "function hello(name) { return 'Hello, ' + name; }",
 	}
-	err = engine.Init([]*jsexecutor.InitScript{initScript})
+	err = engine.Init([]*jsexecutor.JsScript{jsScript})
 	require.NoError(t, err)
 
 	req := &jsexecutor.JsRequest{
@@ -297,11 +297,11 @@ func TestEngine_Execute_Async(t *testing.T) {
 	require.NotNil(t, engine)
 	defer engine.Close()
 
-	initScript := &jsexecutor.InitScript{
+	jsScript := &jsexecutor.JsScript{
 		FileName: "async.js",
 		Content:  "async function hello(name) { return Promise.resolve('Hello, ' + name); }",
 	}
-	err = engine.Init([]*jsexecutor.InitScript{initScript})
+	err = engine.Init([]*jsexecutor.JsScript{jsScript})
 	require.NoError(t, err)
 
 	req := &jsexecutor.JsRequest{

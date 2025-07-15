@@ -11,18 +11,18 @@ import (
 // It shows how to initialize the executor, start it, execute a simple JS function, and stop the executor.
 func Example() {
 	// Prepare a simple JS function as an initialization script
-	initScript := &jsexecutor.InitScript{
+	jsScript := &jsexecutor.JsScript{
 		FileName: "hello.js",
 		Content:  `function hello(name) { return "Hello, " + name + "!"; }`,
 	}
 
-	// Create a QuickJS engine builder and a new executor with the init script
+	// Create a QuickJS engine builder and a new executor with the jsScript
 	executor, err := jsexecutor.NewExecutor(
 		jsexecutor.WithJsEngine(quickjsengine.NewFactory(
 			quickjsengine.WithEnableModuleImport(true),
 			quickjsengine.WithCanBlock(true),
 		)),
-		jsexecutor.WithInitScripts(initScript),
+		jsexecutor.WithJsScripts(jsScript),
 	)
 	if err != nil {
 		fmt.Printf("Failed to create executor: %v\n", err)

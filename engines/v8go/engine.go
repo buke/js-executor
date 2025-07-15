@@ -92,7 +92,7 @@ func newEngine(opts ...Option) (*Engine, error) {
 }
 
 // Init executes initialization scripts in the V8 context.
-func (e *Engine) Init(scripts []*jsexecutor.InitScript) error {
+func (e *Engine) Init(scripts []*jsexecutor.JsScript) error {
 	for _, script := range scripts {
 		if _, err := e.Ctx.RunScript(script.Content, script.FileName); err != nil {
 			return fmt.Errorf("failed to execute init script %s: %w", script.FileName, err)
@@ -103,7 +103,7 @@ func (e *Engine) Init(scripts []*jsexecutor.InitScript) error {
 
 // Reload performs a "hard" reload of the engine by creating a new Isolate and Context.
 // It re-applies the original options and then initializes with the provided scripts.
-func (e *Engine) Reload(scripts []*jsexecutor.InitScript) error {
+func (e *Engine) Reload(scripts []*jsexecutor.JsScript) error {
 	// Close the current engine and release its resources.
 	e.Close()
 

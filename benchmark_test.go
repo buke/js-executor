@@ -24,7 +24,7 @@ function fib(n) {
 
 // runExecutorBenchmark is a helper function to run a benchmark test for a given engine factory.
 func runExecutorBenchmark(b *testing.B, factory jsexecutor.JsEngineFactory) {
-	initScript := &jsexecutor.InitScript{
+	jsScript := &jsexecutor.JsScript{
 		FileName: "benchmark.js",
 		Content:  benchmarkJsScript,
 	}
@@ -32,7 +32,7 @@ func runExecutorBenchmark(b *testing.B, factory jsexecutor.JsEngineFactory) {
 	// Create a new executor with the specified engine
 	executor, err := jsexecutor.NewExecutor(
 		jsexecutor.WithJsEngine(factory),
-		jsexecutor.WithInitScripts(initScript),
+		jsexecutor.WithJsScripts(jsScript),
 		jsexecutor.WithMinPoolSize(16), // Use a fixed pool size for stable benchmark results
 		jsexecutor.WithMaxPoolSize(16), // by setting min and max to the same value.
 	)

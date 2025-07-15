@@ -16,16 +16,15 @@ import (
 // It verifies that the executor can be created, started, execute a JS function, and stopped successfully.
 func TestIntegration_V8GoExecutor(t *testing.T) {
 	// Prepare an initialization script that defines a JS function
-	initScript := &jsexecutor.InitScript{
+	jsScript := &jsexecutor.JsScript{
 		FileName: "hello.js",
 		Content:  `function hello(name) { return "Hello, " + name + "!"; }`,
 	}
 
 	// Create a JsExecutor with the V8 engine and the initialization script
-	// Note: The V8 engine factory currently doesn't have specific options like QuickJS does.
 	executor, err := jsexecutor.NewExecutor(
 		jsexecutor.WithJsEngine(NewFactory()),
-		jsexecutor.WithInitScripts(initScript),
+		jsexecutor.WithJsScripts(jsScript),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, executor)

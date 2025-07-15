@@ -62,7 +62,7 @@ func newEngine(opts ...Option) (*Engine, error) {
 }
 
 // Init runs initialization scripts on the engine's event loop.
-func (e *Engine) Init(scripts []*jsexecutor.InitScript) error {
+func (e *Engine) Init(scripts []*jsexecutor.JsScript) error {
 	done := make(chan error, 1)
 	e.Loop.RunOnLoop(func(vm *goja.Runtime) {
 		for _, script := range scripts {
@@ -78,7 +78,7 @@ func (e *Engine) Init(scripts []*jsexecutor.InitScript) error {
 
 // Reload creates a new event loop and re-initializes the engine.
 // This is a "hard" reload, replacing the entire JS environment.
-func (e *Engine) Reload(scripts []*jsexecutor.InitScript) error {
+func (e *Engine) Reload(scripts []*jsexecutor.JsScript) error {
 	// Stop the old loop and release its resources.
 	e.Close()
 

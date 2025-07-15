@@ -18,8 +18,8 @@ type JsResponse struct {
 	Context map[string]interface{} `json:"context"` // Updated context data
 }
 
-// InitJsScript represents a JavaScript initialization script
-type InitScript struct {
+// JsScript represents a JavaScript script, typically used for initialization.
+type JsScript struct {
 	Content  string // Script content
 	FileName string // Script file name for debugging purposes
 }
@@ -27,10 +27,10 @@ type InitScript struct {
 // JsEngine represents a JavaScript execution engine
 type JsEngine interface {
 	// Init initializes the engine with the given scripts
-	Init(scripts []*InitScript) error
+	Init(scripts []*JsScript) error
 
 	// Reload reloads the engine with new scripts
-	Reload(scripts []*InitScript) error
+	Reload(scripts []*JsScript) error
 
 	// Execute executes a JavaScript request and returns the response
 	Execute(req *JsRequest) (*JsResponse, error)

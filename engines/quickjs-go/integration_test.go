@@ -11,7 +11,7 @@ import (
 // It verifies that the executor can be created, started, execute a JS function, and stopped successfully.
 func TestIntegration_QuickJSExecutor(t *testing.T) {
 	// Prepare an initialization script that defines a JS function
-	initScript := &jsexecutor.InitScript{
+	jsScript := &jsexecutor.JsScript{
 		FileName: "hello.js",
 		Content:  `function hello(name) { return "Hello, " + name + "!"; }`,
 	}
@@ -22,7 +22,7 @@ func TestIntegration_QuickJSExecutor(t *testing.T) {
 			WithEnableModuleImport(true),
 			WithCanBlock(true),
 		)),
-		jsexecutor.WithInitScripts(initScript),
+		jsexecutor.WithJsScripts(jsScript),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, executor)
