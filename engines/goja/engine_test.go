@@ -36,7 +36,7 @@ func TestNewFactory(t *testing.T) {
 }
 
 func TestNewFactory_OptionError(t *testing.T) {
-	errorOption := func(e *Engine) error {
+	errorOption := func(engine jsexecutor.JsEngine) error {
 		return fmt.Errorf("a deliberate config error")
 	}
 	factory := NewFactory(errorOption)
@@ -55,7 +55,7 @@ func TestEngine_Init(t *testing.T) {
 		FileName: "test.js",
 		Content:  "var a = 10;",
 	}
-	err = engine.Init([]*jsexecutor.JsScript{jsScript})
+	err = engine.Load([]*jsexecutor.JsScript{jsScript})
 	require.NoError(t, err)
 
 	gojaEngine := engine.(*Engine)
@@ -77,7 +77,7 @@ func TestEngine_Init_Error(t *testing.T) {
 		FileName: "error.js",
 		Content:  "var a =;", // Syntax error
 	}
-	err = engine.Init([]*jsexecutor.JsScript{jsScript})
+	err = engine.Load([]*jsexecutor.JsScript{jsScript})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "failed to execute init script")
 }
@@ -89,7 +89,7 @@ func TestEngine_Reload(t *testing.T) {
 	defer engine.Close()
 
 	jsScript1 := &jsexecutor.JsScript{FileName: "v1.js", Content: "var version = 1;"}
-	err = engine.Init([]*jsexecutor.JsScript{jsScript1})
+	err = engine.Load([]*jsexecutor.JsScript{jsScript1})
 	require.NoError(t, err)
 
 	jsScript2 := &jsexecutor.JsScript{FileName: "v2.js", Content: "var version = 2;"}
@@ -106,7 +106,7 @@ func TestEngine_Reload(t *testing.T) {
 }
 
 func TestEngine_Reload_Error(t *testing.T) {
-	errorOption := func(e *Engine) error { return fmt.Errorf("reload config error") }
+	errorOption := func(engine jsexecutor.JsEngine) error { return fmt.Errorf("reload config error") }
 	engine, err := NewFactory(errorOption)()
 	require.Error(t, err) // The initial creation fails
 	require.Nil(t, engine)
@@ -114,7 +114,7 @@ func TestEngine_Reload_Error(t *testing.T) {
 	// Test reload on a valid engine, but with faulty original options
 	engine, err = NewFactory()()
 	require.NoError(t, err)
-	engine.(*Engine).opts = []Option{errorOption} // Manually set faulty original options
+	engine.(*Engine).opts = []jsexecutor.JsEngineOption{errorOption} // Manually set faulty original options
 
 	err = engine.Reload(nil)
 	require.Error(t, err)
@@ -140,7 +140,7 @@ func TestEngine_Execute_RejectedPromise(t *testing.T) {
 		FileName: "reject.js",
 		Content:  "function fail() { return Promise.reject('a serious error'); }",
 	}
-	err = engine.Init([]*jsexecutor.JsScript{jsScript})
+	err = engine.Load([]*jsexecutor.JsScript{jsScript})
 	require.NoError(t, err)
 
 	req := &jsexecutor.JsRequest{Service: "fail"}
@@ -158,7 +158,7 @@ func TestEngine_Execute_NonPromiseReturn(t *testing.T) {
 		FileName: "non_promise.js",
 		Content:  "function nonPromise() { return { message: 'not a promise' }; }",
 	}
-	err = engine.Init([]*jsexecutor.JsScript{jsScript})
+	err = engine.Load([]*jsexecutor.JsScript{jsScript})
 	require.NoError(t, err)
 
 	req := &jsexecutor.JsRequest{Service: "nonPromise"}
@@ -275,7 +275,7 @@ func TestEngine_Execute_Sync(t *testing.T) {
 		FileName: "sync.js",
 		Content:  "function hello(name) { return 'Hello, ' + name; }",
 	}
-	err = engine.Init([]*jsexecutor.JsScript{jsScript})
+	err = engine.Load([]*jsexecutor.JsScript{jsScript})
 	require.NoError(t, err)
 
 	req := &jsexecutor.JsRequest{
@@ -301,7 +301,7 @@ func TestEngine_Execute_Async(t *testing.T) {
 		FileName: "async.js",
 		Content:  "async function hello(name) { return Promise.resolve('Hello, ' + name); }",
 	}
-	err = engine.Init([]*jsexecutor.JsScript{jsScript})
+	err = engine.Load([]*jsexecutor.JsScript{jsScript})
 	require.NoError(t, err)
 
 	req := &jsexecutor.JsRequest{

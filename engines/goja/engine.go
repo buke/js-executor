@@ -18,14 +18,14 @@ var rpcScript string
 // Engine implements the jsexecutor.JsEngine interface using the Goja JS engine.
 // It uses an event loop to ensure thread-safe execution of JavaScript.
 type Engine struct {
-	Loop   *eventloop.EventLoop // The event loop that owns and serializes access to the runtime.
-	Option *EngineOption        // Engine configuration options.
-	opts   []Option             // Store original options for reloading.
+	Loop   *eventloop.EventLoop        // The event loop that owns and serializes access to the runtime.
+	Option *EngineOption               // Engine configuration options.
+	opts   []jsexecutor.JsEngineOption // Store original options for reloading.
 }
 
 // NewFactory returns a jsexecutor.JsEngineFactory for creating Goja engines.
 // The factory is configured with the provided options.
-func NewFactory(opts ...Option) jsexecutor.JsEngineFactory {
+func NewFactory(opts ...jsexecutor.JsEngineOption) jsexecutor.JsEngineFactory {
 	return func() (jsexecutor.JsEngine, error) {
 		return newEngine(opts...)
 	}
@@ -33,7 +33,7 @@ func NewFactory(opts ...Option) jsexecutor.JsEngineFactory {
 
 // newEngine creates a new Goja engine instance.
 // It initializes a full-featured event loop that supports timers.
-func newEngine(opts ...Option) (*Engine, error) {
+func newEngine(opts ...jsexecutor.JsEngineOption) (*Engine, error) {
 	// The eventloop creates its own internal goja.Runtime
 	loop := eventloop.NewEventLoop()
 
@@ -61,8 +61,8 @@ func newEngine(opts ...Option) (*Engine, error) {
 	return e, nil
 }
 
-// Init runs initialization scripts on the engine's event loop.
-func (e *Engine) Init(scripts []*jsexecutor.JsScript) error {
+// Load loads scripts on the engine's event loop.
+func (e *Engine) Load(scripts []*jsexecutor.JsScript) error {
 	done := make(chan error, 1)
 	e.Loop.RunOnLoop(func(vm *goja.Runtime) {
 		for _, script := range scripts {
@@ -94,7 +94,7 @@ func (e *Engine) Reload(scripts []*jsexecutor.JsScript) error {
 	e.opts = newE.opts
 
 	// Initialize the new engine with the provided scripts.
-	return e.Init(scripts)
+	return e.Load(scripts)
 }
 
 // Execute runs a JavaScript request and returns the response.

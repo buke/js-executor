@@ -22,12 +22,13 @@ func TestWithRpcScript(t *testing.T) {
 	customScript := "async () => ({ result: 'custom' });"
 	err = WithRpcScript(customScript)(engine)
 	require.NoError(t, err)
-	require.Equal(t, customScript, engine.Option.RpcScript)
+	require.Equal(t, customScript, engine.RpcScript)
 
 	// Test with an empty script. The option itself doesn't validate,
 	// it just sets the value. The engine's creation logic will decide
 	// whether to use the default script or this empty one.
 	err = WithRpcScript("")(engine)
-	require.NoError(t, err)
-	require.Equal(t, "", engine.Option.RpcScript)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "rpc script cannot be empty")
+
 }

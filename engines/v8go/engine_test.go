@@ -37,7 +37,7 @@ func TestNewEngine(t *testing.T) {
 
 	t.Run("With Failing Option", func(t *testing.T) {
 		expectedErr := errors.New("option failed")
-		failingOption := func(e *Engine) error {
+		failingOption := func(engine jsexecutor.JsEngine) error {
 			return expectedErr
 		}
 		engine, err := newEngine(failingOption)
@@ -90,7 +90,7 @@ func TestEngine_Init(t *testing.T) {
 			FileName: "test.js",
 			Content:  "var a = 1;",
 		}
-		err := engine.Init([]*jsexecutor.JsScript{script})
+		err := engine.Load([]*jsexecutor.JsScript{script})
 		require.NoError(t, err)
 	})
 
@@ -99,7 +99,7 @@ func TestEngine_Init(t *testing.T) {
 			FileName: "invalid.js",
 			Content:  "var a =;",
 		}
-		err := engine.Init([]*jsexecutor.JsScript{script})
+		err := engine.Load([]*jsexecutor.JsScript{script})
 		require.Error(t, err)
 	})
 }
@@ -157,7 +157,7 @@ func TestEngine_Execute(t *testing.T) {
 
 	// Init a simple function
 	initScript := &jsexecutor.JsScript{FileName: "test.js", Content: "function add(a, b) { return a + b; }"}
-	err = engine.Init([]*jsexecutor.JsScript{initScript})
+	err = engine.Load([]*jsexecutor.JsScript{initScript})
 	require.NoError(t, err)
 
 	t.Run("Success", func(t *testing.T) {
@@ -262,7 +262,7 @@ func TestEngine_Execute_Fails(t *testing.T) {
 		engine, err := newEngine()
 		require.NoError(t, err)
 		defer engine.Close()
-		err = engine.Init([]*jsexecutor.JsScript{{FileName: "circular.js", Content: circularScript}})
+		err = engine.Load([]*jsexecutor.JsScript{{FileName: "circular.js", Content: circularScript}})
 		require.NoError(t, err)
 
 		req := &jsexecutor.JsRequest{Service: "circular"}

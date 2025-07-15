@@ -20,7 +20,7 @@ func TestEngine_Init_Success(t *testing.T) {
 	scripts := []*jsexecutor.JsScript{
 		{FileName: "init.js", Content: "function add(a, b) { return a + b; }"},
 	}
-	err = engine.Init(scripts)
+	err = engine.Load(scripts)
 	require.NoError(t, err)
 }
 
@@ -33,7 +33,7 @@ func TestEngine_Init_ScriptError(t *testing.T) {
 	scripts := []*jsexecutor.JsScript{
 		{FileName: "bad.js", Content: "function () { syntax error }"},
 	}
-	err = engine.Init(scripts)
+	err = engine.Load(scripts)
 	require.Error(t, err)
 }
 
@@ -46,7 +46,7 @@ func TestEngine_Reload(t *testing.T) {
 	scripts1 := []*jsexecutor.JsScript{
 		{FileName: "a.js", Content: "function foo() { return 1; }"},
 	}
-	require.NoError(t, engine.Init(scripts1))
+	require.NoError(t, engine.Load(scripts1))
 
 	scripts2 := []*jsexecutor.JsScript{
 		{FileName: "b.js", Content: "function foo() { return 2; }"},
@@ -57,7 +57,7 @@ func TestEngine_Reload(t *testing.T) {
 // TestEngine_Reload_Fails tests the failure path of the Reload method.
 func TestEngine_Reload_Fails(t *testing.T) {
 	callCount := 0
-	statefulFailingOption := func(e *Engine) error {
+	statefulFailingOption := func(e jsexecutor.JsEngine) error {
 		callCount++
 		if callCount > 1 {
 			return errors.New("simulated failure on second call")
@@ -85,7 +85,7 @@ func TestEngine_Execute_Success(t *testing.T) {
 	scripts := []*jsexecutor.JsScript{
 		{FileName: "add.js", Content: "function add(a, b) { return a + b; }"},
 	}
-	require.NoError(t, engine.Init(scripts))
+	require.NoError(t, engine.Load(scripts))
 
 	req := &jsexecutor.JsRequest{
 		Id:      "1",
@@ -106,7 +106,7 @@ func TestEngine_Execute_Exception(t *testing.T) {
 	scripts := []*jsexecutor.JsScript{
 		{FileName: "empty.js", Content: ""},
 	}
-	require.NoError(t, engine.Init(scripts))
+	require.NoError(t, engine.Load(scripts))
 
 	req := &jsexecutor.JsRequest{
 		Id:      "2",
@@ -137,7 +137,7 @@ func TestEngine_Close_Idempotent(t *testing.T) {
 
 // TestEngine_NewEngine_OptionError tests error handling when an option returns an error.
 func TestEngine_NewEngine_OptionError(t *testing.T) {
-	opt := func(e *Engine) error { return errors.New("option error") }
+	opt := func(e jsexecutor.JsEngine) error { return errors.New("option error") }
 	engine, err := newEngine(opt)
 	require.Error(t, err)
 	require.Nil(t, engine)
@@ -152,7 +152,7 @@ func TestEngine_Execute_EvalRpcScriptException(t *testing.T) {
 	// Set an invalid RPC script to trigger Eval exception
 	engine.RpcScript = "throw new Error('bad rpc script');"
 	scripts := []*jsexecutor.JsScript{}
-	require.NoError(t, engine.Init(scripts))
+	require.NoError(t, engine.Load(scripts))
 
 	req := &jsexecutor.JsRequest{
 		Id:      "1",
@@ -195,7 +195,7 @@ func TestEngine_Execute_UnmarshalResponseError(t *testing.T) {
 	engine.RpcScript = `(req) => Symbol("x")`
 
 	scripts := []*jsexecutor.JsScript{}
-	require.NoError(t, engine.Init(scripts))
+	require.NoError(t, engine.Load(scripts))
 
 	req := &jsexecutor.JsRequest{
 		Id:      "1",

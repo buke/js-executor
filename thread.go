@@ -90,7 +90,7 @@ func (t *thread) initEngine() error {
 	scripts := t.executor.GetJsScripts()
 
 	// Initialize the engine with scripts
-	if err := t.jsEngine.Init(scripts); err != nil {
+	if err := t.jsEngine.Load(scripts); err != nil {
 		return fmt.Errorf("failed to init JS engine: %w", err)
 	}
 

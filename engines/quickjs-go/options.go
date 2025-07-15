@@ -5,6 +5,8 @@ package quickjsengine
 
 import (
 	"fmt"
+
+	jsexecutor "github.com/buke/js-executor"
 )
 
 // EngineOption holds configuration options for a QuickJS engine instance.
@@ -19,12 +21,13 @@ type EngineOption struct {
 }
 
 // Option is a function that applies a configuration to an Engine instance.
-type Option func(*Engine) error
+// type Option func(*Engine) error
 
 // WithGCThreshold sets the garbage collection threshold for the engine.
 // Use -1 to disable automatic GC, 0 for default, or a positive value for a custom threshold.
-func WithGCThreshold(threshold int64) Option {
-	return func(e *Engine) error {
+func WithGCThreshold(threshold int64) jsexecutor.JsEngineOption {
+	return func(engine jsexecutor.JsEngine) error {
+		e := engine.(*Engine)
 		if threshold < -1 {
 			return fmt.Errorf("invalid GC threshold: %d", threshold)
 		}
@@ -36,8 +39,9 @@ func WithGCThreshold(threshold int64) Option {
 
 // WithMemoryLimit sets the memory limit for the JavaScript runtime in bytes.
 // If limit is 0, there is no memory limit.
-func WithMemoryLimit(limit uint64) Option {
-	return func(e *Engine) error {
+func WithMemoryLimit(limit uint64) jsexecutor.JsEngineOption {
+	return func(engine jsexecutor.JsEngine) error {
+		e := engine.(*Engine)
 		// 0 means no limit, so it's allowed
 		e.Option.MemoryLimit = limit
 		e.Runtime.SetMemoryLimit(limit)
@@ -47,8 +51,9 @@ func WithMemoryLimit(limit uint64) Option {
 
 // WithTimeout sets the script execution timeout in seconds.
 // If timeout is 0, there is no timeout.
-func WithTimeout(timeout uint64) Option {
-	return func(e *Engine) error {
+func WithTimeout(timeout uint64) jsexecutor.JsEngineOption {
+	return func(engine jsexecutor.JsEngine) error {
+		e := engine.(*Engine)
 		// 0 means no timeout, so it's allowed
 		e.Option.Timeout = timeout
 		e.Runtime.SetExecuteTimeout(timeout)
@@ -58,8 +63,9 @@ func WithTimeout(timeout uint64) Option {
 
 // WithMaxStackSize sets the stack size for the JavaScript runtime in bytes.
 // If size is 0, the default stack size is used.
-func WithMaxStackSize(size uint64) Option {
-	return func(e *Engine) error {
+func WithMaxStackSize(size uint64) jsexecutor.JsEngineOption {
+	return func(engine jsexecutor.JsEngine) error {
+		e := engine.(*Engine)
 		// 0 means use default stack size, so it's allowed
 		e.Option.MaxStackSize = size
 		e.Runtime.SetMaxStackSize(size)
@@ -69,8 +75,9 @@ func WithMaxStackSize(size uint64) Option {
 
 // WithCanBlock enables or disables blocking operations in the runtime.
 // Enabling this may affect performance and security.
-func WithCanBlock(canBlock bool) Option {
-	return func(e *Engine) error {
+func WithCanBlock(canBlock bool) jsexecutor.JsEngineOption {
+	return func(engine jsexecutor.JsEngine) error {
+		e := engine.(*Engine)
 		e.Option.CanBlock = canBlock
 		e.Runtime.SetCanBlock(canBlock)
 		return nil
@@ -79,8 +86,9 @@ func WithCanBlock(canBlock bool) Option {
 
 // WithEnableModuleImport enables or disables ES6 module import support.
 // Enabling this may have security implications.
-func WithEnableModuleImport(enable bool) Option {
-	return func(e *Engine) error {
+func WithEnableModuleImport(enable bool) jsexecutor.JsEngineOption {
+	return func(engine jsexecutor.JsEngine) error {
+		e := engine.(*Engine)
 		e.Option.EnableModuleImport = enable
 		e.Runtime.SetModuleImport(enable)
 		return nil
@@ -89,8 +97,9 @@ func WithEnableModuleImport(enable bool) Option {
 
 // WithStrip sets the strip level for bytecode compilation.
 // 0 = no stripping, higher values strip more debug information.
-func WithStrip(strip int) Option {
-	return func(e *Engine) error {
+func WithStrip(strip int) jsexecutor.JsEngineOption {
+	return func(engine jsexecutor.JsEngine) error {
+		e := engine.(*Engine)
 		if strip < 0 || strip > 2 {
 			return fmt.Errorf("invalid strip level: %d", strip)
 		}
@@ -102,8 +111,9 @@ func WithStrip(strip int) Option {
 
 // WithRpcScript sets the RPC script for the engine.
 // The script must not be empty.
-func WithRpcScript(script string) Option {
-	return func(e *Engine) error {
+func WithRpcScript(script string) jsexecutor.JsEngineOption {
+	return func(engine jsexecutor.JsEngine) error {
+		e := engine.(*Engine)
 		if script == "" {
 			return fmt.Errorf("rpc script cannot be empty")
 		}

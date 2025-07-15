@@ -16,16 +16,16 @@ var rpcScript string
 
 // Engine represents a QuickJS engine instance with its runtime, context, and options.
 type Engine struct {
-	Runtime   *quickjs.Runtime // QuickJS runtime instance
-	Ctx       *quickjs.Context // QuickJS context instance
-	Option    *EngineOption    // Engine configuration options
-	RpcScript string           // Embedded RPC script for executing requests
-	opts      []Option         // Store original options for reloading
+	Runtime   *quickjs.Runtime            // QuickJS runtime instance
+	Ctx       *quickjs.Context            // QuickJS context instance
+	Option    *EngineOption               // Engine configuration options
+	RpcScript string                      // Embedded RPC script for executing requests
+	opts      []jsexecutor.JsEngineOption // Store original options for reloading
 }
 
-// Init executes the provided initialization scripts in the engine context.
+// Load Load the provided scripts in the engine context.
 // Each script is evaluated in order. If any script fails, an error is returned.
-func (e *Engine) Init(scripts []*jsexecutor.JsScript) error {
+func (e *Engine) Load(scripts []*jsexecutor.JsScript) error {
 	for _, script := range scripts {
 		if err := e.Ctx.Eval(script.Content, quickjs.EvalFileName(script.FileName), quickjs.EvalAwait(true)); err.IsException() {
 			return fmt.Errorf("failed to execute init script %s: %w", script.FileName, e.Ctx.Exception())
@@ -52,7 +52,7 @@ func (e *Engine) Reload(scripts []*jsexecutor.JsScript) error {
 	}
 
 	// Initialize the new engine with the provided scripts.
-	return e.Init(scripts)
+	return e.Load(scripts)
 }
 
 // Execute runs a JavaScript request using the embedded RPC script as the entry point.
@@ -107,7 +107,7 @@ func (e *Engine) Close() error {
 
 // newEngine creates a new QuickJS engine instance with the given options.
 // It initializes the runtime, context, and applies all provided engine options.
-func newEngine(options ...Option) (*Engine, error) {
+func newEngine(options ...jsexecutor.JsEngineOption) (*Engine, error) {
 	// Create QuickJS runtime
 	rt := quickjs.NewRuntime()
 
@@ -143,7 +143,7 @@ func newEngine(options ...Option) (*Engine, error) {
 }
 
 // NewFactory returns a JsEngineFactory that creates QuickJS engines with the given options.
-func NewFactory(options ...Option) jsexecutor.JsEngineFactory {
+func NewFactory(options ...jsexecutor.JsEngineOption) jsexecutor.JsEngineFactory {
 	return func() (jsexecutor.JsEngine, error) {
 		return newEngine(options...)
 	}

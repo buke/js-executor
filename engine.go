@@ -26,11 +26,11 @@ type JsScript struct {
 
 // JsEngine represents a JavaScript execution engine
 type JsEngine interface {
-	// Init initializes the engine with the given scripts
-	Init(scripts []*JsScript) error
-
 	// Reload reloads the engine with new scripts
 	Reload(scripts []*JsScript) error
+
+	// Load loads additional scripts into the engine
+	Load(scripts []*JsScript) error
 
 	// Execute executes a JavaScript request and returns the response
 	Execute(req *JsRequest) (*JsResponse, error)
@@ -38,6 +38,9 @@ type JsEngine interface {
 	// Close closes the engine and releases resources
 	Close() error
 }
+
+// JsEngineOption represents a configuration option for a JavaScript engine
+type JsEngineOption func(JsEngine) error
 
 // JsEngineFactory defines a function type for creating JavaScript engines
 type JsEngineFactory func() (JsEngine, error)

@@ -4,6 +4,7 @@
 package gojaengine
 
 import (
+	jsexecutor "github.com/buke/js-executor"
 	"github.com/dop251/goja"
 	"github.com/dop251/goja_nodejs/console"
 	"github.com/dop251/goja_nodejs/require"
@@ -17,13 +18,11 @@ type EngineOption struct {
 	FieldNameMapper  goja.FieldNameMapper
 }
 
-// Option is a function that applies a configuration to an Engine instance.
-type Option func(*Engine) error
-
 // WithMaxCallStackSize sets the maximum call stack size for the runtime.
 // A value of 0 or less means no limit.
-func WithMaxCallStackSize(size int) Option {
-	return func(e *Engine) error {
+func WithMaxCallStackSize(size int) jsexecutor.JsEngineOption {
+	return func(engine jsexecutor.JsEngine) error {
+		e := engine.(*Engine)
 		e.Option.MaxCallStackSize = size
 		done := make(chan struct{})
 		e.Loop.RunOnLoop(func(vm *goja.Runtime) {
@@ -36,8 +35,9 @@ func WithMaxCallStackSize(size int) Option {
 }
 
 // WithEnableConsole enables the console object (console.log, etc.) in the JS runtime.
-func WithEnableConsole() Option {
-	return func(e *Engine) error {
+func WithEnableConsole() jsexecutor.JsEngineOption {
+	return func(engine jsexecutor.JsEngine) error {
+		e := engine.(*Engine)
 		e.Option.EnableConsole = true
 		done := make(chan struct{})
 		e.Loop.RunOnLoop(func(vm *goja.Runtime) {
@@ -50,8 +50,9 @@ func WithEnableConsole() Option {
 }
 
 // WithRequire enables the require() function for loading CommonJS modules.
-func WithRequire() Option {
-	return func(e *Engine) error {
+func WithRequire() jsexecutor.JsEngineOption {
+	return func(engine jsexecutor.JsEngine) error {
+		e := engine.(*Engine)
 		e.Option.EnableRequire = true
 		done := make(chan struct{})
 		e.Loop.RunOnLoop(func(vm *goja.Runtime) {
@@ -66,8 +67,9 @@ func WithRequire() Option {
 
 // WithFieldNameMapper sets the field name mapper for Go-to-JS struct conversions.
 // This controls how Go struct field names are exposed in JavaScript.
-func WithFieldNameMapper(mapper goja.FieldNameMapper) Option {
-	return func(e *Engine) error {
+func WithFieldNameMapper(mapper goja.FieldNameMapper) jsexecutor.JsEngineOption {
+	return func(engine jsexecutor.JsEngine) error {
+		e := engine.(*Engine)
 		if mapper != nil {
 			e.Option.FieldNameMapper = mapper
 			done := make(chan struct{})

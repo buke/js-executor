@@ -42,6 +42,18 @@ func (m *mockEngine) Init(scripts []*JsScript) error {
 	return nil
 }
 
+// Load mocks the initialization of the JavaScript engine.
+func (m *mockEngine) Load(scripts []*JsScript) error {
+	m.mu.Lock()
+	m.initCalled = true
+	m.initScripts = scripts
+	m.mu.Unlock()
+	if m.initFunc != nil {
+		return m.initFunc(scripts)
+	}
+	return nil
+}
+
 // Reload mocks reloading the JavaScript engine with new scripts.
 func (m *mockEngine) Reload(scripts []*JsScript) error {
 	m.reloadCalled = true

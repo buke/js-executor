@@ -43,19 +43,34 @@ type Engine struct {
 	RpcScript string
 
 	// opts stores the original options for reloading the engine.
-	opts []Option
+	opts []jsexecutor.JsEngineOption
 }
 
 // NewFactory creates a new jsexecutor.JsEngineFactory for the V8 engine.
-func NewFactory(opts ...Option) jsexecutor.JsEngineFactory {
+func NewFactory(opts ...jsexecutor.JsEngineOption) jsexecutor.JsEngineFactory {
 	return func() (jsexecutor.JsEngine, error) {
 		return newEngine(opts...)
 	}
 }
 
 // newEngine creates and initializes a new V8 Engine instance.
-func newEngine(opts ...Option) (*Engine, error) {
+func newEngine(opts ...jsexecutor.JsEngineOption) (*Engine, error) {
+	// Create a new V8 Isolate
+	iso := v8NewIsolate()
+	if iso == nil {
+		return nil, fmt.Errorf("failed to create v8 isolate")
+	}
+
+	// Create a new V8 Context
+	ctx := v8NewContext(iso)
+	if ctx == nil {
+		iso.Dispose() // Clean up isolate if context creation fails
+		return nil, fmt.Errorf("failed to create v8 context")
+	}
+
 	e := &Engine{
+		Iso:       iso,
+		Ctx:       ctx,
 		Option:    &EngineOption{},
 		RpcScript: rpcScript, // Set default RPC script
 		opts:      opts,      // Store for Reload
@@ -68,31 +83,11 @@ func newEngine(opts ...Option) (*Engine, error) {
 		}
 	}
 
-	// Override default RPC script if provided in options
-	if e.Option.RpcScript != "" {
-		e.RpcScript = e.Option.RpcScript
-	}
-
-	// Create a new V8 Isolate
-	iso := v8NewIsolate()
-	if iso == nil {
-		return nil, fmt.Errorf("failed to create v8 isolate")
-	}
-	e.Iso = iso
-
-	// Create a new V8 Context
-	ctx := v8NewContext(iso)
-	if ctx == nil {
-		iso.Dispose() // Clean up isolate if context creation fails
-		return nil, fmt.Errorf("failed to create v8 context")
-	}
-	e.Ctx = ctx
-
 	return e, nil
 }
 
-// Init executes initialization scripts in the V8 context.
-func (e *Engine) Init(scripts []*jsexecutor.JsScript) error {
+// Load loads initialization scripts in the V8 context.
+func (e *Engine) Load(scripts []*jsexecutor.JsScript) error {
 	for _, script := range scripts {
 		if _, err := e.Ctx.RunScript(script.Content, script.FileName); err != nil {
 			return fmt.Errorf("failed to execute init script %s: %w", script.FileName, err)
@@ -121,7 +116,7 @@ func (e *Engine) Reload(scripts []*jsexecutor.JsScript) error {
 	e.opts = newE.opts
 
 	// Initialize the new engine with the provided scripts.
-	return e.Init(scripts)
+	return e.Load(scripts)
 }
 
 // Execute runs a JavaScript request using the RPC script.
