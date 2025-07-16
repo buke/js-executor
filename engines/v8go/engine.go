@@ -96,29 +96,6 @@ func (e *Engine) Load(scripts []*jsexecutor.JsScript) error {
 	return nil
 }
 
-// Reload performs a "hard" reload of the engine by creating a new Isolate and Context.
-// It re-applies the original options and then initializes with the provided scripts.
-func (e *Engine) Reload(scripts []*jsexecutor.JsScript) error {
-	// Close the current engine and release its resources.
-	e.Close()
-
-	// Create a new engine with the original options.
-	newE, err := newEngine(e.opts...)
-	if err != nil {
-		return fmt.Errorf("failed to create new engine on reload: %w", err)
-	}
-
-	// Replace the current engine's state with the new one.
-	e.Iso = newE.Iso
-	e.Ctx = newE.Ctx
-	e.Option = newE.Option
-	e.RpcScript = newE.RpcScript
-	e.opts = newE.opts
-
-	// Initialize the new engine with the provided scripts.
-	return e.Load(scripts)
-}
-
 // Execute runs a JavaScript request using the RPC script.
 func (e *Engine) Execute(req *jsexecutor.JsRequest) (*jsexecutor.JsResponse, error) {
 	// Run the RPC script to get the handler function

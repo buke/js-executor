@@ -138,6 +138,14 @@ func (p *pool) createThread() (*thread, error) {
 	// Start the thread goroutine
 	go t.run()
 
+	// Wait for the thread to finish initialization
+	if err := <-t.initCh; err != nil {
+		// Initialization failed, so we decrement the thread count and return the error.
+		// The thread is not in the pool yet, so no need to remove it from maps.
+		atomic.AddUint32(&p.threadCount, ^uint32(0)) // -1
+		return nil, fmt.Errorf("thread initialization failed: %w", err)
+	}
+
 	// Add thread to sync.Map (lock-free)
 	p.threads.Store(threadId, t)
 

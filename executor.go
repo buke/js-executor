@@ -129,7 +129,7 @@ func (e *JsExecutor) Reload(scripts ...*JsScript) error {
 		return fmt.Errorf("thread pool is not initialized")
 	}
 
-	if len(scripts) > 0 {
+	if scripts != nil {
 		e.SetJsScripts(scripts) // Use safe setter method.
 	}
 

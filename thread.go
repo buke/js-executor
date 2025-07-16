@@ -47,6 +47,7 @@ type thread struct {
 
 	taskQueue   chan *task                // Channel for receiving tasks to execute
 	actionQueue chan *threadActionRequest // Channel for receiving control actions
+	initCh      chan error                // Channel to signal initialization completion
 
 	lastUsedNano int64  // Timestamp of last task execution (atomic, nanoseconds)
 	taskID       uint32 // Number of tasks executed by this thread (atomic)
@@ -62,6 +63,7 @@ func newThread(executor *JsExecutor, name string, threadId uint32) *thread {
 		threadId:     threadId,
 		taskQueue:    make(chan *task, executor.options.queueSize),
 		actionQueue:  make(chan *threadActionRequest, 1),
+		initCh:       make(chan error, 1),
 		lastUsedNano: time.Now().UnixNano(),
 		taskID:       0,
 	}
@@ -128,8 +130,13 @@ func (t *thread) run() {
 
 	// Initialize the JavaScript engine
 	if err := t.initEngine(); err != nil {
-		panic(fmt.Sprintf("failed to initialize JS engine for thread %s: %v", t.name, err))
+		t.initCh <- err
+		close(t.initCh)
+		return
 	}
+	// Signal successful initialization
+	t.initCh <- nil
+	close(t.initCh)
 
 	// Main execution loop
 	for {
@@ -168,61 +175,38 @@ func (t *thread) run() {
 func (t *thread) executeAction(req *threadActionRequest) {
 	switch req.action {
 	case actionStop:
-		if t.executor.logger != nil {
-			t.executor.logger.Debug("Thread stopping", "thread", t.name)
-		}
 		// Close the JavaScript engine
-		if t.jsEngine != nil {
-			if err := t.jsEngine.Close(); err != nil {
-				if t.executor.logger != nil {
-					t.executor.logger.Error("Failed to close JS engine",
-						"thread", t.name,
-						"error", err)
-				}
-			}
-			t.jsEngine = nil
+		err := t.jsEngine.Close()
+		if err != nil && t.executor.logger != nil {
+			t.executor.logger.Error("Failed to close JS engine",
+				"thread", t.name,
+				"error", err)
 		}
-		req.done <- nil
-
-	case actionReload:
-		if t.executor.logger != nil {
-			t.executor.logger.Debug("Thread starting reload", "thread", t.name)
-		}
-		// Get initialization scripts safely
-		scripts := t.executor.GetJsScripts()
-		err := t.jsEngine.Reload(scripts)
+		t.jsEngine = nil
 		req.done <- err
 
-		if err != nil {
-			fmt.Printf("Thread %s reload failed: %v\n", t.name, err)
-			if t.executor.logger != nil {
-				t.executor.logger.Error("Thread reload failed",
-					"thread", t.name,
-					"error", err)
-			}
-		} else {
-			if t.executor.logger != nil {
-				t.executor.logger.Debug("Thread reload completed successfully",
-					"thread", t.name)
-			}
+	case actionReload:
+		// Get initialization scripts safely
+		scripts := t.executor.GetJsScripts()
+		err := t.jsEngine.Load(scripts)
+		if err != nil && t.executor.logger != nil {
+			t.executor.logger.Error("Thread reload failed",
+				"thread", t.name,
+				"error", err)
 		}
+		req.done <- err
 
 	case actionRetire:
-		if t.executor.logger != nil {
-			t.executor.logger.Debug("Thread retiring", "thread", t.name)
-		}
 		// Close the JavaScript engine
-		if t.jsEngine != nil {
-			if err := t.jsEngine.Close(); err != nil {
-				if t.executor.logger != nil {
-					t.executor.logger.Error("Failed to close JS engine",
-						"thread", t.name,
-						"error", err)
-				}
-			}
-			t.jsEngine = nil
+		err := t.jsEngine.Close()
+		if err != nil && t.executor.logger != nil {
+			t.executor.logger.Error("Failed to close JS engine",
+				"thread", t.name,
+				"error", err)
 		}
-		req.done <- nil
+		t.jsEngine = nil
+		req.done <- err
+
 	default:
 		// Handle unknown action types
 		req.done <- nil

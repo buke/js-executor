@@ -60,7 +60,7 @@ func TestThread_InitEngine_FactoryError(t *testing.T) {
 // TestThread_InitEngine_InitError tests error handling when engine.Init fails.
 func TestThread_InitEngine_InitError(t *testing.T) {
 	engine := &mockEngine{
-		initFunc: func(scripts []*JsScript) error { return errors.New("init error") },
+		loadFunc: func(scripts []*JsScript) error { return errors.New("init error") },
 	}
 	exec := &JsExecutor{
 		engineFactory: func() (JsEngine, error) { return engine, nil },
@@ -160,7 +160,7 @@ func TestThread_Run_And_Execute(t *testing.T) {
 // TestThread_ExecuteAction_ReloadError tests error handling in reload action.
 func TestThread_ExecuteAction_ReloadError(t *testing.T) {
 	engine := &mockEngine{
-		reloadFunc: func(scripts []*JsScript) error { return errors.New("reload error") },
+		loadFunc: func(scripts []*JsScript) error { return errors.New("reload error") },
 	}
 	exec := &JsExecutor{
 		engineFactory: func() (JsEngine, error) { return engine, nil },
@@ -392,7 +392,7 @@ func TestThread_ExecuteAction_Reload_Error(t *testing.T) {
 	exec := &JsExecutor{
 		engineFactory: func() (JsEngine, error) {
 			return &mockEngine{
-				reloadFunc: func(scripts []*JsScript) error { return errors.New("reload error") },
+				loadFunc: func(scripts []*JsScript) error { return errors.New("reload error") },
 			}, nil
 		},
 		logger:  slog.Default(),

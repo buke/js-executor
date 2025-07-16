@@ -34,27 +34,6 @@ func (e *Engine) Load(scripts []*jsexecutor.JsScript) error {
 	return nil
 }
 
-// Reload performs a "hard" reload of the engine by creating a new runtime and context.
-// It re-applies the original options and then initializes with the provided scripts.
-func (e *Engine) Reload(scripts []*jsexecutor.JsScript) error {
-	// Close the current engine and release its resources.
-	e.Close()
-
-	e.Runtime = quickjs.NewRuntime()
-	e.Ctx = e.Runtime.NewContext()
-
-	// Apply additional engine options
-	for _, option := range e.opts {
-		if err := option(e); err != nil {
-			e.Close()
-			return fmt.Errorf("failed to apply option: %w", err)
-		}
-	}
-
-	// Initialize the new engine with the provided scripts.
-	return e.Load(scripts)
-}
-
 // Execute runs a JavaScript request using the embedded RPC script as the entry point.
 // The request is marshaled to JS, passed to the RPC function, and the response is unmarshaled back to Go.
 func (e *Engine) Execute(req *jsexecutor.JsRequest) (*jsexecutor.JsResponse, error) {

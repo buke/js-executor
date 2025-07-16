@@ -104,51 +104,6 @@ func TestEngine_Init(t *testing.T) {
 	})
 }
 
-// TestEngine_Reload tests the Reload method.
-func TestEngine_Reload(t *testing.T) {
-	engine, err := newEngine()
-	require.NoError(t, err)
-	defer engine.Close()
-
-	// Set a variable in the initial context
-	_, err = engine.Ctx.RunScript("var initialVar = 'old';", "setup.js")
-	require.NoError(t, err)
-
-	// Reload with a new script
-	newScript := &jsexecutor.JsScript{FileName: "new.js", Content: "var newVar = 'new';"}
-	err = engine.Reload([]*jsexecutor.JsScript{newScript})
-	require.NoError(t, err)
-
-	// Verify the old variable does not exist
-	val, err := engine.Ctx.RunScript("typeof initialVar", "check.js")
-	require.NoError(t, err)
-	require.Equal(t, "undefined", val.String())
-
-	// Verify the new variable exists
-	val, err = engine.Ctx.RunScript("newVar", "check.js")
-	require.NoError(t, err)
-	require.Equal(t, "new", val.String())
-}
-
-// TestEngine_Reload_Fails tests the failure path of the Reload method.
-func TestEngine_Reload_Fails(t *testing.T) {
-	engine, err := newEngine()
-	require.NoError(t, err)
-	defer engine.Close()
-
-	originalNewContext := v8NewContext
-	v8NewContext = func(opt ...v8go.ContextOption) *v8go.Context {
-		return nil
-	}
-	defer func() {
-		v8NewContext = originalNewContext
-	}()
-
-	err = engine.Reload([]*jsexecutor.JsScript{})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "failed to create new engine on reload: failed to create v8 context")
-}
-
 // TestEngine_Execute tests the success path and business logic failures of the Execute method.
 func TestEngine_Execute(t *testing.T) {
 	engine, err := newEngine()

@@ -82,45 +82,6 @@ func TestEngine_Init_Error(t *testing.T) {
 	require.Contains(t, err.Error(), "failed to execute init script")
 }
 
-func TestEngine_Reload(t *testing.T) {
-	engine, err := NewFactory()()
-	require.NoError(t, err)
-	require.NotNil(t, engine)
-	defer engine.Close()
-
-	jsScript1 := &jsexecutor.JsScript{FileName: "v1.js", Content: "var version = 1;"}
-	err = engine.Load([]*jsexecutor.JsScript{jsScript1})
-	require.NoError(t, err)
-
-	jsScript2 := &jsexecutor.JsScript{FileName: "v2.js", Content: "var version = 2;"}
-	err = engine.Reload([]*jsexecutor.JsScript{jsScript2})
-	require.NoError(t, err)
-
-	gojaEngine := engine.(*Engine)
-	done := make(chan goja.Value, 1)
-	gojaEngine.Loop.RunOnLoop(func(vm *goja.Runtime) {
-		done <- vm.Get("version")
-	})
-	result := <-done
-	require.Equal(t, int64(2), result.Export())
-}
-
-func TestEngine_Reload_Error(t *testing.T) {
-	errorOption := func(engine jsexecutor.JsEngine) error { return fmt.Errorf("reload config error") }
-	engine, err := NewFactory(errorOption)()
-	require.Error(t, err) // The initial creation fails
-	require.Nil(t, engine)
-
-	// Test reload on a valid engine, but with faulty original options
-	engine, err = NewFactory()()
-	require.NoError(t, err)
-	engine.(*Engine).opts = []jsexecutor.JsEngineOption{errorOption} // Manually set faulty original options
-
-	err = engine.Reload(nil)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "reload config error")
-}
-
 func TestEngine_Execute_NilRequest(t *testing.T) {
 	engine, err := NewFactory()()
 	require.NoError(t, err)

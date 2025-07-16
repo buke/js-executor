@@ -76,27 +76,6 @@ func (e *Engine) Load(scripts []*jsexecutor.JsScript) error {
 	return <-done
 }
 
-// Reload creates a new event loop and re-initializes the engine.
-// This is a "hard" reload, replacing the entire JS environment.
-func (e *Engine) Reload(scripts []*jsexecutor.JsScript) error {
-	// Stop the old loop and release its resources.
-	e.Close()
-
-	// Create a new engine with the original options.
-	newE, err := newEngine(e.opts...)
-	if err != nil {
-		return fmt.Errorf("failed to create new engine on reload: %w", err)
-	}
-
-	// Replace the current engine's state with the new one.
-	e.Loop = newE.Loop
-	e.Option = newE.Option
-	e.opts = newE.opts
-
-	// Initialize the new engine with the provided scripts.
-	return e.Load(scripts)
-}
-
 // Execute runs a JavaScript request and returns the response.
 // It schedules the execution on the event loop and handles async results.
 func (e *Engine) Execute(req *jsexecutor.JsRequest) (*jsexecutor.JsResponse, error) {

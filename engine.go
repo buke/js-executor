@@ -26,10 +26,7 @@ type JsScript struct {
 
 // JsEngine represents a JavaScript execution engine
 type JsEngine interface {
-	// Reload reloads the engine with new scripts
-	Reload(scripts []*JsScript) error
-
-	// Load loads additional scripts into the engine
+	// Load loads scripts into the engine
 	Load(scripts []*JsScript) error
 
 	// Execute executes a JavaScript request and returns the response

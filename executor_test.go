@@ -15,51 +15,34 @@ import (
 
 // mockEngine is a simple mock implementation of JsEngine for testing.
 type mockEngine struct {
-	mu           sync.Mutex  // Mutex for concurrent access
-	initCalled   bool        // Whether Init was called
-	reloadCalled bool        // Whether Reload was called
-	closeCalled  bool        // Whether Close was called
-	initScripts  []*JsScript // Scripts passed to Init/Reload
-	executedReq  *JsRequest  // Last executed request
-	executeResp  *JsResponse // Response to return from Execute
-	executeErr   error       // Error to return from Execute
+	mu          sync.Mutex  // Mutex for concurrent access
+	loadCalled  bool        // Whether Reload was called
+	closeCalled bool        // Whether Close was called
+	initScripts []*JsScript // Scripts passed to Init/Reload
+	executedReq *JsRequest  // Last executed request
+	executeResp *JsResponse // Response to return from Execute
+	executeErr  error       // Error to return from Execute
 
-	initFunc    func(scripts []*JsScript) error           // Custom Init behavior (if set)
-	reloadFunc  func(scripts []*JsScript) error           // Custom Reload behavior (if set)
+	loadFunc    func(scripts []*JsScript) error           // Custom Load behavior (if set)
 	executeFunc func(req *JsRequest) (*JsResponse, error) // Custom Execute behavior (if set)
 	closeFunc   func() error                              // Custom Close behavior (if set)
-}
-
-// Init mocks the initialization of the JavaScript engine.
-func (m *mockEngine) Init(scripts []*JsScript) error {
-	m.mu.Lock()
-	m.initCalled = true
-	m.initScripts = scripts
-	m.mu.Unlock()
-	if m.initFunc != nil {
-		return m.initFunc(scripts)
-	}
-	return nil
 }
 
 // Load mocks the initialization of the JavaScript engine.
 func (m *mockEngine) Load(scripts []*JsScript) error {
 	m.mu.Lock()
-	m.initCalled = true
+	m.loadCalled = true
 	m.initScripts = scripts
 	m.mu.Unlock()
-	if m.initFunc != nil {
-		return m.initFunc(scripts)
+	// Check for a specific "bad" script to simulate a load error.
+	for _, script := range scripts {
+		if script.FileName == "bad.js" {
+			fmt.Printf("Mock load failed due to bad script: %s\n", script.FileName)
+			return errors.New("load failed due to bad script")
+		}
 	}
-	return nil
-}
-
-// Reload mocks reloading the JavaScript engine with new scripts.
-func (m *mockEngine) Reload(scripts []*JsScript) error {
-	m.reloadCalled = true
-	m.initScripts = scripts
-	if m.reloadFunc != nil {
-		return m.reloadFunc(scripts)
+	if m.loadFunc != nil {
+		return m.loadFunc(scripts)
 	}
 	return nil
 }

@@ -6,6 +6,7 @@ package jsexecutor
 import (
 	"errors"
 	"log/slog"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -13,11 +14,11 @@ import (
 )
 
 // mockEngineFactoryWithError returns a factory that fails on reload or execute if specified.
-func mockEngineFactoryWithError(reloadErr, execErr error) JsEngineFactory {
+func mockEngineFactoryWithError(loadErr, execErr error) JsEngineFactory {
 	return func() (JsEngine, error) {
 		return &mockEngine{
-			reloadFunc: func(scripts []*JsScript) error {
-				return reloadErr
+			loadFunc: func(scripts []*JsScript) error {
+				return loadErr
 			},
 			executeFunc: func(req *JsRequest) (*JsResponse, error) {
 				if execErr != nil {
@@ -266,7 +267,7 @@ func TestPool_Reload(t *testing.T) {
 
 	// Test reload error
 	exec2 := &JsExecutor{
-		engineFactory: mockEngineFactoryWithError(errors.New("reload fail"), nil),
+		engineFactory: mockEngineFactory(), // Use a normal factory, error is triggered by data
 		options: &JsExecutorOption{
 			minPoolSize: 1,
 			maxPoolSize: 1,
@@ -276,10 +277,15 @@ func TestPool_Reload(t *testing.T) {
 	p2 := newPool(exec2)
 	_ = p2.start()
 	defer p2.stop()
+
+	// Set a "bad" script that will cause the engine's Load method to fail
+	p2.executor.SetJsScripts([]*JsScript{{FileName: "bad.js", Content: "var x = 1;"}})
+
 	err := p2.reload()
-	if err == nil || err.Error() == "" {
-		t.Error("expected reload error")
+	if err == nil || !strings.Contains(err.Error(), "load failed due to bad script") {
+		t.Errorf("expected reload error containing 'load failed due to bad script', got: %v", err)
 	}
+
 }
 
 // TestPool_Stop tests pool stop logic.
