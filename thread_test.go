@@ -179,6 +179,55 @@ func TestThread_ExecuteAction_ReloadError(t *testing.T) {
 	}
 }
 
+// TestThread_ExecuteAction_Stop_EngineNil tests the stop action when jsEngine is already nil.
+func TestThread_ExecuteAction_Stop_EngineNil(t *testing.T) {
+	exec := &JsExecutor{
+		engineFactory: mockEngineFactory(),
+		options:       &JsExecutorOption{queueSize: 1},
+	}
+	th := newThread(exec, "t_stop_nil", 200)
+	// Do NOT call th.initEngine(), so th.jsEngine is nil
+	req := &threadActionRequest{
+		action: actionStop,
+		done:   make(chan error, 1),
+	}
+	th.executeAction(req)
+	err := <-req.done
+	if err != nil {
+		t.Errorf("expected nil error when stopping with nil jsEngine, got %v", err)
+	}
+}
+
+// TestThread_ExecuteAction_Stop_PanicInClose tests panic in Close function
+func TestThread_ExecuteAction_Stop_PanicInClose(t *testing.T) {
+	exec := &JsExecutor{
+		engineFactory: func() (JsEngine, error) {
+			return &mockEngine{
+				closeFunc: func() error {
+					panic("panic in Close")
+				},
+			}, nil
+		},
+		logger:  slog.Default(),
+		options: &JsExecutorOption{queueSize: 1},
+	}
+	th := newThread(exec, "t_stop_panic", 201)
+	_ = th.initEngine()
+	req := &threadActionRequest{
+		action: actionStop,
+		done:   make(chan error, 1),
+	}
+	th.executeAction(req)
+	select {
+	case err := <-req.done:
+		if err == nil {
+			t.Fatal("expected a panic error, but got nil")
+		}
+	case <-time.After(1 * time.Second):
+		t.Fatal("timeout waiting for action stop")
+	}
+}
+
 // TestThread_GetTaskCountAndLastUsed tests task count and last used timestamp.
 func TestThread_GetTaskCountAndLastUsed(t *testing.T) {
 	exec := &JsExecutor{
@@ -428,4 +477,17 @@ func TestThread_ExecuteAction_Default(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected nil error for default action, got %v", err)
 	}
+}
+
+// TestThread_ExecuteAction_NilRequest tests executeAction with nil request.
+func TestThread_ExecuteAction_NilRequest(t *testing.T) {
+	exec := &JsExecutor{
+		engineFactory: mockEngineFactory(),
+		logger:        slog.Default(),
+		options:       &JsExecutorOption{queueSize: 1},
+	}
+	th := newThread(exec, "t_nil_req", 888)
+	_ = th.initEngine()
+	// Should not panic, should log error
+	th.executeAction(nil)
 }

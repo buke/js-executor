@@ -106,17 +106,9 @@ func (t *thread) run() {
 
 	// Cleanup when the thread exits
 	defer func() {
-		if r := recover(); r != nil {
-			if t.executor.logger != nil {
-				t.executor.logger.Error("Thread panic",
-					"thread", t.name,
-					"error", r)
-			}
-		}
-		// Close the JavaScript engine on exit
 		if t.jsEngine != nil {
 			if err := t.jsEngine.Close(); err != nil {
-				if t.executor.logger != nil {
+				if t.executor != nil && t.executor.logger != nil {
 					t.executor.logger.Error("Failed to close JS engine",
 						"thread", t.name,
 						"error", err)
@@ -132,6 +124,12 @@ func (t *thread) run() {
 	if err := t.initEngine(); err != nil {
 		t.initCh <- err
 		close(t.initCh)
+		if t.executor != nil && t.executor.logger != nil {
+			t.executor.logger.Error("Failed to initialize JS engine",
+				"thread", t.name,
+				"error", err,
+			)
+		}
 		return
 	}
 	// Signal successful initialization
@@ -173,18 +171,27 @@ func (t *thread) run() {
 
 // executeAction executes a thread action (stop, reload, retire, or default).
 func (t *thread) executeAction(req *threadActionRequest) {
-	switch req.action {
-	case actionStop:
-		// Close the JavaScript engine
-		err := t.jsEngine.Close()
-		if err != nil && t.executor.logger != nil {
-			t.executor.logger.Error("Failed to close JS engine",
-				"thread", t.name,
-				"error", err)
+	defer func() {
+		if r := recover(); r != nil {
+			err := fmt.Errorf("panic in executeAction: %v", r)
+			if t.executor != nil && t.executor.logger != nil {
+				t.executor.logger.Error("Panic recovered in executeAction", "thread", t.name, "action", req.action.String(), "error", r)
+			}
+			// Ensure the done channel is notified even on panic
+			if req.done != nil {
+				req.done <- err
+			}
 		}
-		t.jsEngine = nil
-		req.done <- err
+	}()
 
+	if req == nil {
+		if t.executor != nil && t.executor.logger != nil {
+			t.executor.logger.Error("executeAction called with nil request", "thread", t.name)
+		}
+		return
+	}
+
+	switch req.action {
 	case actionReload:
 		// Get initialization scripts safely
 		scripts := t.executor.GetJsScripts()
@@ -196,16 +203,37 @@ func (t *thread) executeAction(req *threadActionRequest) {
 		}
 		req.done <- err
 
+	case actionStop:
+		// Close the JavaScript engine
+		if t.jsEngine != nil {
+			err := t.jsEngine.Close()
+			if err != nil && t.executor.logger != nil {
+				t.executor.logger.Error("Failed to close JS engine",
+					"thread", t.name,
+					"error", err)
+			}
+			t.jsEngine = nil
+			req.done <- err
+		} else {
+			// If engine is already nil, just signal completion
+			req.done <- nil
+		}
+
 	case actionRetire:
 		// Close the JavaScript engine
-		err := t.jsEngine.Close()
-		if err != nil && t.executor.logger != nil {
-			t.executor.logger.Error("Failed to close JS engine",
-				"thread", t.name,
-				"error", err)
+		if t.jsEngine != nil {
+			err := t.jsEngine.Close()
+			if err != nil && t.executor.logger != nil {
+				t.executor.logger.Error("Failed to close JS engine",
+					"thread", t.name,
+					"error", err)
+			}
+			t.jsEngine = nil
+			req.done <- err
+		} else {
+			// If engine is already nil, just signal completion
+			req.done <- nil
 		}
-		t.jsEngine = nil
-		req.done <- err
 
 	default:
 		// Handle unknown action types
@@ -223,7 +251,7 @@ func (t *thread) executeTask(task *task) {
 				response: nil,
 				err:      fmt.Errorf("panic in thread %s: %v", t.name, r),
 			}
-			if t.executor.logger != nil {
+			if t.executor != nil && t.executor.logger != nil {
 				t.executor.logger.Error("Task execution panic",
 					"thread", t.name,
 					"taskID", t.getTaskCount(),
