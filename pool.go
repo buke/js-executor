@@ -152,12 +152,6 @@ func (p *pool) createThread() (*thread, error) {
 	// Add thread ID to round-robin list (copy-on-write)
 	p.addThreadToList(threadId)
 
-	if p.executor.logger != nil {
-		p.executor.logger.Debug("Thread created",
-			"thread", t.name,
-			"totalThreads", atomic.LoadUint32(&p.threadCount))
-	}
-
 	return t, nil
 }
 
