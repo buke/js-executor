@@ -62,6 +62,19 @@ func (p *pool) start() error {
 		go p.retireThreads()
 	}
 
+	if p.executor.logger != nil {
+		p.executor.logger.Debug("Thread pool started",
+			"minPoolSize", p.executor.options.minPoolSize,
+			"maxPoolSize", p.executor.options.maxPoolSize,
+			"queueSize", p.executor.options.queueSize,
+			"threadTTL", p.executor.options.threadTTL,
+			"maxExecutions", p.executor.options.maxExecutions,
+			"executeTimeout", p.executor.options.executeTimeout,
+			"createThreshold", p.executor.options.createThreshold,
+			"selectThreshold", p.executor.options.selectThreshold,
+			"initialThreads", p.threadCount,
+		)
+	}
 	return nil
 }
 
@@ -82,6 +95,11 @@ func (p *pool) stop() error {
 	emptyIds := make([]uint32, 0)
 	p.threadIds.Store(&emptyIds)
 	atomic.StoreUint32(&p.threadCount, 0)
+
+	if p.executor.logger != nil {
+		p.executor.logger.Debug("Thread pool stopped")
+	}
+
 	return nil
 }
 
@@ -274,6 +292,14 @@ func (p *pool) reload() error {
 		}
 		return true // Continue iteration
 	})
+
+	if p.executor.logger != nil {
+		if reloadError == nil {
+			p.executor.logger.Debug("All threads reloaded successfully",
+				"threadCount", p.threadCount,
+			)
+		}
+	}
 
 	return reloadError
 }
