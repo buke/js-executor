@@ -163,7 +163,9 @@ func (t *thread) run() {
 			}
 		case actionReq := <-t.actionQueue:
 			// Queue all control actions, execute in order after tasks are done
-			pendingActions = append(pendingActions, actionReq)
+			if actionReq != nil {
+				pendingActions = append(pendingActions, actionReq)
+			}
 			continue
 		}
 	}
