@@ -52,7 +52,7 @@ func TestNewEngine_Fails(t *testing.T) {
 	t.Run("Isolate Creation Fails", func(t *testing.T) {
 		// Monkey-patch the function to simulate failure
 		originalNewIsolate := v8NewIsolate
-		v8NewIsolate = func() *v8go.Isolate {
+		v8NewIsolate = func(opts ...v8go.IsolateOption) *v8go.Isolate {
 			return nil
 		}
 		defer func() {
